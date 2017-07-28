@@ -207,7 +207,11 @@ handles.text_SessionDirectory.String = handles.sessionDir;
 handles.DirectoryTitle.String = 'Loading/Converting to binary';
 guidata(hObject, handles)
 
-handles.ops        = buildConfigFile(handles.sessionDir);
+if exist(fullfile(handles.sessionDir, 'ops.mat'))
+    handles.ops = load(fullfile(handles.sessionDir, 'ops.mat'));
+else
+    handles.ops        = buildConfigFile(handles.sessionDir);
+end
 handles.DirectoryTitle.String = handles.sessionName;
 
 % read in binary data
@@ -249,7 +253,7 @@ hs = handles.popupHeadstageSelect.String{handles.popupHeadstageSelect.Value};
 handles.ops.headstage = hardware.headstage.(hs);
 
 % --- Apply Channel map
-handles.chanMap = handles.ops.headstage.mapChannels(handles.ops.probe);
+handles.ops.chanMap = handles.ops.headstage.mapChannels(handles.ops.probe);
 
 % --- Default Referencing
 handles.popup_ReferenceOptions.String = {'None', 'CommonAverage'};
@@ -607,11 +611,11 @@ function Button_Save_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-chanMap   = handles.chanMap;
-n         = numel(handles.chanMap);
+chanMap   = handles.ops.chanMap;
+n         = numel(handles.ops.chanMap);
 connected = true(n, 1); % connected(1:2) = 0;
-xcoords = zeros(1,n);
-ycoords = 50*(1:n); 
+xcoords   = zeros(1,n);
+ycoords   = 50*(1:n); 
 
 % Often, multi-shank probes or tetrodes will be organized into groups of
 % channels that cannot possibly share spikes with the rest of the probe. This helps
@@ -631,8 +635,9 @@ kcoords = ones(1,n);
 % would be good to also save the sampling frequency here
 fs = handles.ops.fs; 
 ops = handles.ops;
+ops.chanMap = fullfile(ops.root, 'chanMap.mat');
 save(fullfile(handles.ops.root, 'ops.mat'), '-v7.3', '-struct', 'ops');
-save(handles.ops.chanMap, 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
+save(ops.chanMap, 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
 
 
 
@@ -649,6 +654,7 @@ fprintf('-----------------------------------------------------------------\n')
 fprintf('Running Kilosort\n')
 
 ops = handles.ops;
+ops.parfor = true;
 
 if ops.GPU
     fprintf('Using GPU for faster processing\n')
@@ -656,7 +662,12 @@ if ops.GPU
     gpuDevice(1); % initialize GPU (will erase any existing GPU arrays)
 end
 
-ops = removeArtifacts(ops);
+[path_to, file, ext]=fileparts(ops.fbinary);
+fOut=fullfile(path_to, [file '_hp' ext]);
+% if ~exist(fOut, 'file')
+    ops = removeArtifacts(ops);
+% end
+ops.fbinary = fOut;
 
 % main spike-sorting routine
 [rez, DATA, uproj] = preprocessData(ops); % preprocess data and extract spikes for initialization
