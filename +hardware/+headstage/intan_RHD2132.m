@@ -14,7 +14,9 @@ classdef intan_RHD2132 < hardware.headstage.headstage
             p.samplingRate = 30000;
             p.connector    = 'Omnetics36';
             p.gains        = nan;
-            p.channelMap   = [0 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 9 0 0 25 26 27 28 29 30 31 32 1 2 3 4 5 6 7 8 0];
+%             p.channelMap   = [nan 24:-1:9 nan nan 25:32 1:8 nan]; % from
+            p.channelMap   = [nan 9:24 nan nan 8:-1:1 32:-1:25 nan]; % from
+% 
         end
         
          function chanMap = mapChannels(p, probe)
