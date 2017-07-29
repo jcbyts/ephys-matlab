@@ -1,6 +1,8 @@
-function [dataDir, val] = selectSessions
+function [dataDir, val] = selectSessions(dataDir)
 
-dataDir = uigetdir(pwd, 'Select Data Directory');
+if nargin<1
+    dataDir = uigetdir(pwd, 'Select Data Directory');
+end
 
 fl = dir(dataDir);
 fl(1:2) = []; % remove relative directories
