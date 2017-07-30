@@ -102,7 +102,7 @@ for j = 1:ops.Nchan
 end
 
 % --- concatenate binary files
-ops.fbinary = fullfile(ops.root, 'rawbinary_concat.dat');
+ops.fbinary = fullfile(ops.root, 'ephys.dat');
 path_to=fileparts(ops.fbinary);
 
 if isempty(path_to)
@@ -181,11 +181,17 @@ if ~exist(fname, 'file')
                 % save timestamps of all starts and stops
                 ts_ = seg(1);
                 ns_ = numel(seg)*SAMPLES_PER_RECORD;
-                stops = find(diff(seg)~=SAMPLES_PER_RECORD);
+                stops = find(diff(seg)~=SAMPLES_PER_RECORD)+1;
                 
                 if any(stops)
-                    ts_ = [ts_ seg(stops)];
-                    ns_ = diff([0 find(stops)])*SAMPLES_PER_RECORD;
+                    ts_ = [ts_ seg(stops)'];
+                    ns_ = diff([0 stops(:)' numel(seg)])*SAMPLES_PER_RECORD;
+                    
+                    %                 fprintf('Found multiple paused segments\n')
+                    %                 figure
+                    %                 plot(seg, '.')
+                    %                 hold on
+                    %                 plot(cumsum([[0 ns_(1:end-1)]; ns_], 2)/SAMPLES_PER_RECORD, [ts_; ts_])
                 end
                 
                 nFragments = numel(ns_);
@@ -250,11 +256,14 @@ if ~exist(fname, 'file')
     
     fclose(fidout);
     
-    save(fullfile(fpath, 'binary_info.mat'), '-v7.3', '-struct', 'info')
+    save(fullfile(fpath, 'ephys_info.mat'), '-v7.3', '-struct', 'info')
     
     fprintf('Done [%02.2fs]\n', toc)
     
 end
+
+ops.bitVolts = info.bitVolts;
+ops.fs =info.sampleRate;
 
 save(fullfile(fpath, 'ops.mat'), '-v7.3', '-struct', 'ops')
 
