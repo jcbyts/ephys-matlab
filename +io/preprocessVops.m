@@ -6,6 +6,10 @@ if exist(fullfile(ops.root, ops.chanMap), 'file')
     error('Implement loading of channel map here')   
 end
 
+if exist(fullfile(ops.root, ops.chanMap), 'file')
+    error('Implement loading of channel map here')   
+end
+
 assert(size(plot_buffer,2)>size(plot_buffer,1), 'data is probably transposed')
 
 % apply channel map
@@ -15,7 +19,23 @@ plot_buffer     = plot_buffer(ops.chanMap, :);
 if ops.NotchFilter60
     wo = 60/(ops.fs/2);  bw = wo/35;
     [b,a] = iirnotch(wo,bw);
+    
+%     fs = ops.fs; fo = 60;  q = 35; bw = (fo/(fs/2))/q;
+%     [b,a] = iircomb(fs/fo, bw, 'notch');
 
+    datr = plot_buffer';
+
+    datr = filter(b, a, datr);
+    datr = flipud(datr);
+    datr = filter(b, a, datr);
+    datr = flipud(datr);
+
+    plot_buffer = datr';
+    
+    
+    wo = 180/(ops.fs/2);  bw = wo/35;
+    [b,a] = iirnotch(wo,bw);
+    
     datr = plot_buffer';
 
     datr = filter(b, a, datr);
@@ -66,5 +86,5 @@ end
 
 % --- convert to milivolts
 for i = 1:ops.Nchan
-    plot_buffer(i,:) = ops.chHeaders(i).bitVolts*plot_buffer(i,:);
+    plot_buffer(i,:) = ops.bitVolts*plot_buffer(i,:);
 end
