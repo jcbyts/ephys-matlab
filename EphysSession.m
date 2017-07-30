@@ -207,7 +207,7 @@ handles.text_SessionDirectory.String = handles.sessionDir;
 handles.DirectoryTitle.String = 'Loading/Converting to binary';
 guidata(hObject, handles)
 
-if exist(fullfile(handles.sessionDir, 'ops.mat'))
+if exist(fullfile(handles.sessionDir, 'ops.mat'), 'file')
     handles.ops = load(fullfile(handles.sessionDir, 'ops.mat'));
 else
     handles.ops        = buildConfigFile(handles.sessionDir);
@@ -695,7 +695,7 @@ function checkbox_artifactremoval_Callback(hObject, eventdata, handles)
 useArtRemoval = get(hObject, 'Value');
 if useArtRemoval
     val = str2double(handles.Input_ArtifactSize.String);
-    handles.ops.artifactThresh = val/handles.ops.chHeaders(1).bitVolts;
+    handles.ops.artifactThresh = val/handles.ops.bitVolts;
     handles.ops.artifactNchans = str2double(handles.Input_ArtifactChannelRange.String);
 else
     handles.ops.artifactThresh = inf;    

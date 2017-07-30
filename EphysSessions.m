@@ -9,6 +9,10 @@ dataPath = 'C:\Data\Ellie_3-sessions_2017-07-24_2017-07-26\';
 
 
 %% KiloSort
+
+ops = load(fullfile(dataPath, 'ops.mat'));
+ops.parfor = true;
+
 %% artifact detection goes here?
 
 % additional preprocessing steps before running kilosort
@@ -18,7 +22,7 @@ dataPath = 'C:\Data\Ellie_3-sessions_2017-07-24_2017-07-26\';
 ops=removeArtifacts(ops);
 
 %% check that the timing lines up
-checkRawBinaryMatch(ops, 10e3)
+% checkRawBinaryMatch(ops, 10e3)
 
 %% main spike-sorting routine
 [rez, DATA, uproj] = preprocessData(ops); % preprocess data and extract spikes for initialization
@@ -31,7 +35,7 @@ rez                = fullMPMU(rez, DATA);% extract final spike times (overlappin
 fprintf('saving matlab results file\n')
 save(fullfile(ops.root,  'rez.mat'), 'rez', 'ops', '-v7.3');
 
-rez                = merge_posthoc2(rez);
+% rez                = merge_posthoc2(rez);
 fprintf('saving python files for Phy\n')
 % save python results file for Phy
 rezToPhy(rez, ops.root);
