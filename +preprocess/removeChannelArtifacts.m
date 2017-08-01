@@ -1,5 +1,9 @@
-function [data,bad] = removeChannelArtifacts(data, sizeThresh, chanThresh, win)
+function [data,bad] = removeChannelArtifacts(data, sizeThresh, chanThresh, win, repWithNan)
+% [data,bad] = removeChannelArtifacts(data, sizeThresh, chanThresh, win)
 
+if nargin < 5
+    repWithNan = false;
+end
 % verbose = true;
 
 
@@ -25,7 +29,11 @@ bad=unique(bsxfun(@plus,find(crossings), -win:win));
 bad(bad<1)=[];
 bad(bad>max(sz))=[];
 
-data(bad,:)=0;
+if repWithNan
+    data(bad,:)=nan;
+else
+    data(bad,:)=0;
+end
 
 if trpose
     data = data';
