@@ -15,7 +15,7 @@ fseek(fid, 0, 'bof');
 Nchan = ops.Nchan;
 
 nTotSamp = filesize/Nchan;
-if ~exist('inds', 'var')
+if ~exist('inds', 'var') || isempty(inds)
     inds = 1:nTotSamp;
     bufferSize = [Nchan nTotSamp];
 else

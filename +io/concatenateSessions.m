@@ -205,7 +205,7 @@ if ~exist(fname, 'file')
                 info.fragments  = [info.fragments ns_];
                 
                 % --- skip header
-                fseek(fid{j}, NUM_HEADER_BYTES, 0);
+                fseek(fid{j}, NUM_HEADER_BYTES, 'bof');
             end
             
             
