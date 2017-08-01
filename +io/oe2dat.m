@@ -1,4 +1,5 @@
 function ops = oe2dat(oepath)
+% ops = oe2dat(oepath)
 
 % --- declare constants
 NUM_HEADER_BYTES    = 1024; % size of header for each analog file
@@ -8,6 +9,34 @@ BLOCK_BYTES         = 2070; % see load_open_ephys_data_faster
 fephys  = fullfile(oepath, 'ephys.dat');
 fops    = fullfile(oepath, 'ops.mat');
 finfo   = fullfile(oepath, 'ephys_info.mat');
+fsess   = fullfile(oepath, 'session_info.mat');
+
+sessionInfo = struct('subject', [], 'dateNum', [], 'date', [], 'time', [], 'note', []);
+
+% extract session info from directory naming convention
+pat = '(?<subject>\D+)\_(?<date>[\d-]+)\_(?<time>[\d-]+)\_(?<note>[^]+)';
+
+[~, sessionPath] = fileparts(oepath);
+s = regexp(sessionPath, pat, 'names');
+sessionInfo.subject = s.subject;
+sessionInfo.dateNum = datenum([s.date '-' s.time], 'yyyy-mm-dd-HH-MM-SS');
+sessionInfo.date    = datestr(sessionInfo.dateNum, 'yyyy-mm-dd');
+sessionInfo.time    = datestr(sessionInfo.dateNum, 'HH:MM:SS');
+sessionInfo.note    = s.note;
+sessionInfo.path    = oepath;
+
+save(fsess, 'sessionInfo')
+
+% --- get channel info
+fl  = dir(fullfile(sessionInfo.path, '*CH*.continuous'));
+str = 'CH(\d+)';
+chlist = cellfun(@(x) cell2mat(regexp(x, str, 'match')) , {fl.name}, 'UniformOutput', false);
+
+sessionInfo.channels = unique(cellfun(@(x) str2double(x(3:end)), chlist));
+sessionInfo.numChannels = numel(sessionInfo.channels);
+sessionInfo.ops         = dir(fullfile(sessionInfo.path, 'ops.mat'));
+
+
 
 % --- get channel info
 fl  = dir(fullfile(oepath, '*CH*.continuous'));
@@ -115,7 +144,7 @@ for k = 1:nBlocks
             info.fragments  = [info.fragments ns_];
             
             % --- skip header
-            fseek(fid{j}, NUM_HEADER_BYTES, 0);
+            fseek(fid{j}, NUM_HEADER_BYTES, 'bof');
         end
         
         
