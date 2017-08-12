@@ -9,6 +9,9 @@ nPdsFiles = numel(pdsList);
 PDS = cell(nPdsFiles,1);
 fprintf('Found [%d] PDS files\n', nPdsFiles)
 fprintf('Aligning with OE clock now\n')
+
+reconError = nan(nPdsFiles,1);
+
 for kPdsFile = 1:nPdsFiles
     
     tmp = load(pdsList{kPdsFile}, '-mat');
@@ -30,11 +33,22 @@ for kPdsFile = 1:nPdsFiles
         fprintf('%d) No Ephys Data\n', kPdsFile);
     else
         fprintf('%d) Strobe times aligned. Max reconstruction error is %2.3f ms\n', kPdsFile, maxreconstructionerror*1e3)
+        reconError(kPdsFile) = maxreconstructionerror*1e3;
     end
+    
     
     PDS{kPdsFile} = tmp.PDS;
 end
 
+badSync = reconError > .1;
 noEphys = cellfun(@(x) isempty(x.maxreconstructionerror), PDS);
 
-PDS(noEphys) = [];
+PDS(noEphys | badSync) = [];
+
+dt = cellfun(@(x) x.initialParametersMerged.session.initTime, PDS);
+[~, id] = sort(dt);
+PDS = PDS(id);
+
+nT = cellfun(@(x) numel(x.data), PDS);
+PDS(nT==1) = [];
+

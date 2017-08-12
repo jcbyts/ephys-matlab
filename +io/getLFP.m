@@ -26,6 +26,7 @@ if exist(flfp, 'file')
     data = fread(fid, bufferSize, '*int16');
     
     info = load(flfpInfo);
+%     info.timestamps = info.timestamps/30e3;
     
     data = double(data')*info.bitVolts;
     
@@ -72,14 +73,15 @@ dataRAW = fread(fid, bufferSize, '*int16');
 
 fprintf('[%02.2fs]\n', toc)
 
-% --- correct phase from Open Ephys headstage (e.g., Okun 2016)
-fprintf('Correcting phase from OE headstage @ %dHz...\t', OE_HIGHPASS)
 dataRAW = dataRAW';
-
-for ch = 1:Nchan
-    dataRAW(:,ch) = correctOeLfpPhase(dataRAW(:,ch), sampleRate, OE_HIGHPASS);
-end
-fprintf('[%02.2fs]\n', toc)
+% --- correct phase from Open Ephys headstage (e.g., Okun 2016)
+% fprintf('Correcting phase from OE headstage @ %dHz...\t', OE_HIGHPASS)
+% dataRAW = double(dataRAW');
+% 
+% for ch = 1:Nchan
+%     dataRAW(:,ch) = preprocess.correctOeLfpPhase(dataRAW(:,ch), info.sampleRate, OE_HIGHPASS);
+% end
+% fprintf('[%02.2fs]\n', toc)
 
 % --- low pass filter
 fprintf('Lowpass filter at %dHz...\t', LOW_CUTOFF)
@@ -128,15 +130,15 @@ for ch = 1:Nchan
         figure(f(1)); clf
     end
       
-    newdata = preprocess.removeLineNoiseChunkwise(data(iigood,ch), newFs, LINE_NOISE_FREQ, 2, 30, plotIt);
+    newdata = preprocess.removeLineNoiseChunkwise(data(iigood,ch), NEW_FS, LINE_NOISE_FREQ, 2, 30, plotIt);
     
     
     if plotIt
         figure(f(2)); clf
         subplot(211)
-        [PxxMean1, fr, ~, ~, Pxx1] = ephys.estimatePSD_welch(zscore(data(iigood,ch)), [], [], 5e3, newFs, []);
+        [PxxMean1, fr, ~, ~, Pxx1] = ephys.estimatePSD_welch(zscore(data(iigood,ch)), [], [], 5e3, NEW_FS, []);
         plot(fr, 10 * log10(PxxMean1), '-k'); hold on
-        [PxxMean, fr, ~, ~, Pxx] = ephys.estimatePSD_welch(zscore(newdata), [], [], 5e3, newFs, []);
+        [PxxMean, fr, ~, ~, Pxx] = ephys.estimatePSD_welch(zscore(newdata), [], [], 5e3, NEW_FS, []);
         plot(fr, 10 * log10(PxxMean), '-r');
         subplot(212)
         plot(fr, 10 * log10(Pxx1), '-k'); hold on
@@ -162,7 +164,6 @@ fwrite(fout, dataInt, 'int16');
 
 save(flfpInfo, '-v7.3', '-struct', 'newInfo')
 
-timestamps = io.convertSamplesToTime((1:10e5/downStep), info.sampleRate/downStep, info.timestamps(:), info.fragments(:)/downStep);
-
+timestamps = io.convertSamplesToTime((1:nTotSamp)', info.sampleRate, info.timestamps(:), info.fragments(:));
 fclose(fid);
 fclose(fout);

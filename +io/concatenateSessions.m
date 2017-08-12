@@ -1,5 +1,13 @@
-function varargout = concatenateSessions(dataPath)
+function varargout = concatenateSessions(dataPath, varargin)
 % CONCATENATE SESSIONS concatenates multiples sessions together
+
+ip = inputParser();
+ip.addParameter('ChannelIndex', 1:32)
+ip.addParameter('CsdAlign', true)
+ip.addParameter('CsdMaxShift', 4)
+ip.addParameter('CsdAnchorSession', [])
+
+ip.parse(varargin{:})
 
 if nargin<1
     dataPath = uigetdir(pwd, 'Select Data Directory');
@@ -57,21 +65,24 @@ for i = 1:nSessions
 end
 
 % --- get index for channels that are common to all sessions
+ChannelIndex = ip.Results.ChannelIndex;
+
 goodChannels = sessionInfo(1).channels;
 for i = 1:nSessions
     goodChannels = intersect(goodChannels, sessionInfo(i).channels);
 end
+goodChannels = intersect(goodChannels, ChannelIndex);
 
 % --- Make new directory and concatenate binary file for analysis
-fpath = fullfile(dataPath, sprintf('%s_%d-sessions_%s_%s', sessionInfo(1).subject, nSessions, sessionInfo(1).date, sessionInfo(end).date));
-
-save(fullfile(fpath, 'session_info.mat'), 'sessionInfo')
+fpath = fullfile(dataPath, sprintf('%s_%d-sessions_%s_%s_Ch%d-%d', sessionInfo(1).subject, nSessions, sessionInfo(1).date, sessionInfo(end).date, goodChannels(1), goodChannels(end)));
 
 if ~exist(fpath, 'dir')
     mkdir(fpath)
 end
 
-% check that at least one of the sessions has an ops
+save(fullfile(fpath, 'session_info.mat'), 'sessionInfo')
+
+% --- check that at least one of the sessions has an ops
 hasOps = arrayfun(@(x) ~isempty(x.ops), sessionInfo);
 assert(any(hasOps), 'You must run EphysSession on at least one session before concatenating.')
 
@@ -84,22 +95,133 @@ end
 ops.root  = fpath;
 ops.Nchan = numel(goodChannels);
 
-% --- get list of all files
-fs = cell(ops.Nchan,1);
-for j = 1:ops.Nchan
+% -------------------------------------------------------------------------
+% --- Try to allign channels using the CSD
+if ip.Results.CsdAlign
+    fprintf('Attempting allignment based on the CSD\n')
     
-    ch = goodChannels(j);
-    
-    fs{j} = [];
-    for i = 1:nSessions
+    % --- Step 1: Calculate CSD for each session
+    clear CSD
+    sessionIx = 1:numel(sessionInfo);
+    figure; clf
+    for i = 1:numel(sessionInfo)
         
-        tmp = dir(fullfile(sessionInfo(i).path, sprintf('*CH%d.continuous',ch) ));
-        % if separate files are saved by open ephys gui 
-        tmp_ = dir(fullfile(sessionInfo(i).path, sprintf('*CH%d_*.continuous', ch) ));
         
-        fs{j} = [fs{j} tmp tmp_];
+        oepath = sessionInfo(i).path;
+        CSD(i) = session.computeCSD(oepath);
+        [sess, ~, ~] = io.loadSession(oepath);
+        subplot(1,numel(sessionIx), i)
+        imagesc(CSD(i).time, CSD(i).depths, CSD(i).csd); hold on
+        plot(CSD(i).time(1:CSD(i).imRescale:end), bsxfun(@plus, CSD(i).pots, CSD(i).depths(1:CSD(i).imRescale:end)), 'k')
+        colormap jet
+        title(sess.date)
+        
+        drawnow
     end
+    
+    % --- Step 2: compare to anchor point
+    if isempty(ip.Results.CsdAnchorSession)
+        baseCsd = ceil(numel(sessionInfo)/2);
+    else
+        baseCsd = ip.Results.CsdAnchorSession;
+    end
+    
+    shiftSize = nan(numel(CSD),1);
+
+    for kCsd = 1:numel(CSD)
+
+        sz = size(CSD(baseCsd).csd);
+        maxShift = ip.Results.CsdMaxShift;
+        
+        % shift by integer channel numbers
+        nChannels = ceil(sz(1)/CSD(baseCsd).imRescale);
+        
+        baseIdx = (maxShift+1):(nChannels-maxShift);
+        
+        shifts = -maxShift:maxShift;
+        nShifts = numel(shifts);
+        
+        csd1 = CSD(baseCsd).csd(1:CSD(baseCsd).imRescale:end,:);
+        csd2 = CSD(kCsd).csd(1:CSD(kCsd).imRescale:end,:);
+        
+        figure(1); clf
+        
+        for iShift = 1:nShifts
+            
+            
+            shift = shifts(iShift);
+            testIdx = baseIdx + shift;
+            
+            
+            subplot(1,3,1)
+            imagesc(csd1(baseIdx,:));
+            subplot(1,3,2)
+            imagesc(csd2(testIdx,:));
+            subplot(1,3,3)
+            
+            a(iShift) = sum(sum(csd1(baseIdx,:) .* csd2(testIdx,:)));
+            plot(shifts(1:iShift), a(1:iShift), '-o'); hold on
+            pause(0.15)
+            
+        end
+        [~, shiftId] = max(a);
+        shiftSize(kCsd) = shifts(shiftId);
+    end
+    
+    load(ops.chanMap)
+    
+    if ip.Results.CsdAlign
+        goodChannels = goodChannels(ip.Results.CsdMaxShift:(numel(goodChannels)-ip.Results.CsdMaxShift));
+    end
+    
+    ops.Nchan = numel(goodChannels);
+    
+    % --- get list of all files
+    fs = cell(ops.Nchan,1);
+    for j = 1:ops.Nchan
+        
+        
+        fs{j} = [];
+        for i = 1:nSessions
+            
+            % channel shifted by CSD shift size for this session
+            ch = chanMap(goodChannels(j)+shiftSize(i));
+            
+            tmp = dir(fullfile(sessionInfo(i).path, sprintf('*CH%d.continuous',ch) ));
+            % if separate files are saved by open ephys gui
+            tmp_ = dir(fullfile(sessionInfo(i).path, sprintf('*CH%d_*.continuous', ch) ));
+            
+            fs{j} = [fs{j} tmp tmp_(:)'];
+        end
+    end
+    
+    ops.chanMap = 1:ops.Nchan;
+    
+    
+    
+else
+    
+    % --- get list of all files
+    fs = cell(ops.Nchan,1);
+    for j = 1:ops.Nchan
+        
+        ch = goodChannels(j);
+        
+        fs{j} = [];
+        for i = 1:nSessions
+            
+            tmp = dir(fullfile(sessionInfo(i).path, sprintf('*CH%d.continuous',ch) ));
+            % if separate files are saved by open ephys gui
+            tmp_ = dir(fullfile(sessionInfo(i).path, sprintf('*CH%d_*.continuous', ch) ));
+            
+            fs{j} = [fs{j} tmp tmp_(:)'];
+        end
+    end
+    
+    
 end
+
+
 
 % --- concatenate binary files
 ops.fbinary = fullfile(ops.root, 'ephys.dat');
@@ -264,6 +386,32 @@ end
 
 ops.bitVolts = info.bitVolts;
 ops.fs =info.sampleRate;
+
+if ip.Results.CsdAlign
+   
+    chanMap   = 1:ops.Nchan;
+    n         = numel(chanMap);
+    connected = true(n, 1); % connected(1:2) = 0;
+    xcoords   = zeros(1,n);
+    ycoords   = 50*(1:n);
+    
+    % Often, multi-shank probes or tetrodes will be organized into groups of
+    % channels that cannot possibly share spikes with the rest of the probe. This helps
+    % the algorithm discard noisy templates shared across groups. In
+    % this case, we set kcoords to indicate which group the channel belongs to.
+    % In our case all channels are on the same shank in a single group so we
+    % assign them all to group 1.
+    
+    kcoords = ones(1,n);
+    fs = ops.fs;
+    ops.chanMap = fullfile(ops.root, 'chanMap.mat');
+    save(ops.chanMap, 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
+    
+
+ 
+    
+    
+end
 
 save(fullfile(fpath, 'ops.mat'), '-v7.3', '-struct', 'ops')
 

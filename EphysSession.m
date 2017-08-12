@@ -255,6 +255,12 @@ handles.ops.headstage = hardware.headstage.(hs);
 % --- Apply Channel map
 handles.ops.chanMap = handles.ops.headstage.mapChannels(handles.ops.probe);
 
+% apply channel map
+if numel(handles.ops.chanMap) < handles.ops.Nchan
+    newChans = setdiff(1:handles.ops.Nchan, handles.ops.chanMap);
+    handles.ops.chanMap = [handles.ops.chanMap(:); newChans(:)]';
+end
+
 % --- Default Referencing
 handles.popup_ReferenceOptions.String = {'None', 'CommonAverage'};
 

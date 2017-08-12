@@ -22,7 +22,7 @@ ss = readNPY(fullfile(folderNames{f},  'spike_times.npy'));
 
 % convert to times in seconds
 % st = double(ss)/Fs;
-st = io.convertSamplesToTime(ss, Fs, info.timestamps(:), info.fragments(:));
+st = io.convertSamplesToTime(double(ss), Fs, info.timestamps(:), info.fragments(:));
 
 % spikeTemplates is like clu, except with the template numbers rather than
 % cluster numbers. Each spike was extracted by one particular template
@@ -114,7 +114,19 @@ sp(f).tempAmps = tempAmps;
 sp(f).spikeDepths = spikeDepths;
 sp(f).tempsUnW = tempsUnW;
 
+[cgs, uQ, cR, isiV] = sqKilosort.computeAllMeasures(folderNames{f});
+bad = cgs==0;
+cgs(bad) = [];
+uQ(bad) = [];
+cR(bad) = [];
+isiV(bad) = [];
+assert(all(sp(f).cgs == cgs), 'Quality Rating does not match')
+sp(f).cgs2 = cgs;
+sp(f).uQ = uQ;
+sp(f).cR = cR;
+sp(f).isiV = isiV;
 end
+
 
 %% depths and amplitudes of clusters (as the mean depth and amplitude of all of their constituent spikes)
 % get firing rates here also
@@ -143,3 +155,4 @@ for s = 1:numel(folderNames)
     sp(s).firingRates = spikeCounts'./recordingDuration;
     
 end
+

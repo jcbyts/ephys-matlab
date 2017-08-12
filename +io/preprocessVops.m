@@ -3,16 +3,16 @@ function [plot_buffer, ops] = preprocessVops(plot_buffer, ops)
 % specified in ops
 
 if exist(fullfile(ops.root, ops.chanMap), 'file')
-    error('Implement loading of channel map here')   
-end
-
-if exist(fullfile(ops.root, ops.chanMap), 'file')
-    error('Implement loading of channel map here')   
+    error('io.preprocessVops: Implement loading of channel map here')   
 end
 
 assert(size(plot_buffer,2)>size(plot_buffer,1), 'data is probably transposed')
 
 % apply channel map
+if numel(ops.chanMap) < ops.Nchan
+    newChans = setdiff(1:ops.Nchan, ops.chanMap);
+    ops.chanMap = [ops.chanMap(:); newChans(:)];
+end
 plot_buffer     = plot_buffer(ops.chanMap, :);
 
 % notch filter
