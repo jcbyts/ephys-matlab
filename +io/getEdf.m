@@ -1,11 +1,23 @@
-function [data, timestamps, elInfo] = getEdf(ops, PDS, overwrite)
-% [data, timestamps, elInfo] = getEdf(ops, PDS)
+function [data, timestamps, elInfo] = getEdf(sess, PDS, overwrite)
+% GET EDF loads / converts Eyelink datafiles
+% The first time it is called, getEdf converts the edf file to a binary/mat
+% combo, where the binary file contains raw data and the mat file contains
+% meta-data. 
+% Inputs:
+%   session@struct    - session info struct (or struct-array)
+%   PDS@cell          - cell array of PDS structures
+%   overwrite@logical - flag to reimport
+% Outputs:
+%   data@double       - n x 3 [x y pupil]
+%   timestamps@double - n x 1 (time in OE time)
+%   elInfo@struct     - meta data
+% Example call:
+% [data, timestamps, elInfo] = io.getEdf(ops, PDS)
+
+% 2017.08.14     jly     wrote it
 
 if nargin < 3
     overwrite = false;
-    if nargin < 2
-        PDS = io.getPds(ops);
-    end
 end
 
 elInfo.timestamps = [];
@@ -15,29 +27,34 @@ elInfo.dateNum    = [];
 elInfo.fields     = {'EyeX', 'EyeY', 'PupilArea'};
 elInfo.bitDeg     = 1e-3;
 
-feye    = fullfile(ops.root, 'eyepos.dat');
-felinfo = fullfile(ops.root, 'eye_info.mat');
+feye    = fullfile(sess.path, '_behavior', 'eyepos.dat');
+felinfo = fullfile(sess.path, '_behavior', 'eye_info.mat');
 
 if exist(feye, 'file') && ~overwrite
-   elInfo = load(felinfo);
-   
-   fid = fopen(feye, 'r');
-   fseek(fid, 0, 'eof');
-   filesize = ftell(fid);
-   fseek(fid, 0, 'bof');
-   
-   nFields = numel(elInfo.fields);
-   nTotSamps = filesize/nFields/2;
-   
-   data = double(fread(fid, [nFields nTotSamps], '*uint16'));
-   data(1:2,:) = data(1:2,:)*elInfo.bitDeg(1) + elInfo.bitDeg(2);
-   data(1,data(3,:)==0) = nan;
-   data(2,data(3,:)==0) = nan;
-   
-   timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
-   
+    elInfo = load(felinfo);
+    
+    fid = fopen(feye, 'r');
+    fseek(fid, 0, 'eof');
+    filesize = ftell(fid);
+    fseek(fid, 0, 'bof');
+    
+    nFields = numel(elInfo.fields);
+    nTotSamps = filesize/nFields/2;
+    
+    data = double(fread(fid, [nFields nTotSamps], '*uint16'));
+    data(1:2,:) = data(1:2,:)*elInfo.bitDeg(1) + elInfo.bitDeg(2);
+    data(1,data(3,:)==0) = nan;
+    data(2,data(3,:)==0) = nan;
+    
+    timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+    
     return
     
+end
+
+% load PDS if it doesn't exist
+if nargin < 2
+    PDS = io.getPds(sess);
 end
 
 fidout = fopen(feye, 'w');
@@ -45,8 +62,8 @@ fidout = fopen(feye, 'w');
 nPds = numel(PDS);
 
 for kPds = 1:nPds
-
-    [dataRAW, ~, el_info] = getEdfData(ops, PDS{kPds});
+    
+    [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds});
     fwrite(fidout, dataRAW', '*uint16')
     
     elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
@@ -82,7 +99,7 @@ timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.time
 
 end
 
-function [data, timestamps, info] = getEdfData(ops, PDS)
+function [data, timestamps, info] = getEdfData(sess, PDS)
 
 
 
@@ -113,7 +130,7 @@ eyeIdx = PDS.initialParametersMerged.eyelink.eyeIdx;
 
 [~, edfFile, ~] = fileparts(PDS.initialParametersMerged.session.file);
 
-elFile=fullfile(ops.root, [edfFile '.edf']);
+elFile=fullfile(sess.path, [edfFile '.edf']);
 hasEdf=exist(elFile, 'file');
 if hasEdf
     el=edfmex(elFile);
@@ -184,4 +201,3 @@ timestamps = EL2OE(edfTime);
 info.timestamps = timestamps([1 breaks]);
 info.dateNum = PDS.initialParametersMerged.session.initTime;
 end
-    

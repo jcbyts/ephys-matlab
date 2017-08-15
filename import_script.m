@@ -13,6 +13,8 @@
 % 3) Eyelink files (*.edf) - These are proprietrary filetpe from SR
 %           research for storying eyelink data.
 
+cd C:\Users\Jake\Repos\ephys-matlab\
+addEphysMatlab
 %% Step 0: setup for import
 
 % Make sure you have already copied the data from the server to the local 
@@ -25,12 +27,26 @@
 oepath = uigetdir();
 
 % --- setup the hardware you used
-headstages = {hardware.headstage.intan_RHD2132, hardware.headstage.intan_RHD2132};
+clear shank
+
+% setup shank2 (plugged into first headstage)
+shank{1} = hardware.electrode.Shank2;
+% specify what type of headstage was used
+shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
+shank{1}.name = 'V1';
+
+% For the single electrodes specify a custom channel map using numbers
+% relative to the headstage start. eg., if using ch36 plugged into
+% headstage 2, this should be channel 4 (relative to the start of
+% headstage 2)
 
 % list single electrode channels (this can be a vector if > 1 electrode used)
-singleElectrodeChannelNumber = 4; % this is relative to the start of that headstage (not absolute channel #)
+% chanMap = 4;
+% shank{2} = hardware.electrode.customChannelMap(chanMap);
+% shank{2}.name = 'MtBurrHoleMapping';
+% If you chose hardware.electrode.customChannelMap(chNum), the channel map
+% will be chanMap. That's it. No specifying headstage necessary.
 
-electrodes = {hardware.electrode.Shank2, hardware.electrode.SingleElectrodes(singleElectrodeChannelNumber)};
 
 %% Step 1: convert the raw ephys data
 % we represent all of our ephys data as a binary file (integers only) and a
@@ -44,25 +60,74 @@ electrodes = {hardware.electrode.Shank2, hardware.electrode.SingleElectrodes(sin
 % our book-keeping
 
 % --- convert raw data (this can be slow)
-ops = io.oe2dat(oepath, 'headstages', headstages, 'electrodes', electrodes);
+io.oe2dat(oepath, shank);
 
-%%
-% TODO: make Ephys session take in a path
-EphysSession
 
-%% 
+%% Step 2: Spike Sort Array Shanks with Kilo
 ops = io.loadOps(oepath);
 
-preprocess.runKiloSort(ops)
-%%
-preprocess.KiloAutomerge(ops)
+% which "Shanks" correspond to arrays?
+shanksToSortWithKilo = find(cellfun(@(x) numel(x.channelMap)>16, shank));
 
-%%
+% Sorting channels that are not part of a single array will result in
+% errors
 
-[session, ops, info] = io.loadSession(oepath);
+for i = 1:numel(shanksToSortWithKilo)
+    iShank = shanksToSortWithKilo(i);
+    
+    % run Kilosort
+    preprocess.runKiloSort(ops(iShank), 'GPU', true, 'parfor', true, 'verbose', true, 'showfigures', false, 'merge', false);
 
-[lfp, lfpTime, lfpInfo] = io.getLFP(ops);
+    % run KiloAutomerge
+    preprocess.KiloAutomerge(ops(iShank));
+    
+    
+    fprintf('--------------------------------------------------------------\n')
+    fprintf('--------------------------------------------------------------\n')
+    fprintf('For manual stage using Phy run "Anaconda Prompt" from the START menu\n')
+    fprintf('Enter the following lines into the prompt:\n\n')
+    fprintf('activate phy\n')
+    fprintf('cd %s\n', ops(iShank).root)
+    fprintf('phy template-gui params.py\n')
+    commandwindow
+    pause(1)
+    fprintf('\n\n')
+    fprintf('For keyboard shortcuts and sorting instructions, go to:\n')
+    fprintf('http://phy-contrib.readthedocs.io/en/latest/template-gui/#keyboard-shortcuts\n')
+    
+    fprintf('importing spikes to matlab\n')
+    io.getSpikesFromKilo(ops(iShank))
+end
 
-PDS = io.getPds(session);
-%%
-[data, timestamps, elInfo] = io.getEdf(ops, PDS, 1);
+
+%% Step 3: Spike sort single electrodes (if they exist)
+singleTrodes = find(cellfun(@(x) numel(x.channelMap) < 4, shank));
+if any(singleTrodes)
+    clear sp
+    for i = 1:numel(singleTrodes)
+        iShank = singleTrodes(i);
+
+        sp(i) = preprocess.runSingleChannelSpikeSortMog(ops(iShank));
+    end
+end
+
+%% Step 4: Import LFP
+% Loop over sessions and import the local field potential
+% This is really slow because of the line-noise fitting and correction
+ops = io.loadOps(oepath);
+
+for i = 1:numel(ops)
+    io.getLFP(ops);
+end
+
+%% Step 5: Import PLDAPS / eyelink files
+
+% --- load session: This is central to all operations
+[sess, ops, info] = io.loadSession(oepath);
+
+
+PDS = io.getPds(sess);
+
+overwrite = false; 
+[data, timestamps, elInfo] = io.getEdf(sess, PDS, overwrite);
+

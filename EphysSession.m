@@ -54,6 +54,9 @@ function EphysSession_OpeningFcn(hObject, eventdata, handles, varargin)
 
 % Choose default command line output for EphysSession
 handles.output = hObject;
+if nargin > 3
+    handles.sessionDir = varargin{1};
+end
 
 % --- Turn off panels until data is loaded
 handles.Panel_ArtRem.Visible    = 'off';
@@ -253,8 +256,12 @@ hs = handles.popupHeadstageSelect.String{handles.popupHeadstageSelect.Value};
 handles.ops.headstage = hardware.headstage.(hs);
 
 % --- Apply Channel map
+if exist(handles.ops.chanMap, 'file')
+    load(handles.ops.chanMap)
+    handles.ops.chanMap = chanMap;
+else
 handles.ops.chanMap = handles.ops.headstage.mapChannels(handles.ops.probe);
-
+end
 % apply channel map
 if numel(handles.ops.chanMap) < handles.ops.Nchan
     newChans = setdiff(1:handles.ops.Nchan, handles.ops.chanMap);

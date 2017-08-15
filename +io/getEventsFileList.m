@@ -1,4 +1,5 @@
 function evList = getEventsFileList(sessionInfo)
+% evList = getEventsFileList(sessionInfo)
 
 nSessions = numel(sessionInfo);
 

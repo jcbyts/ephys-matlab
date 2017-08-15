@@ -1,6 +1,17 @@
 function [OE2PTBfit, OE2PTB,PTB2OE, maxreconstructionerror ] = sync2OeClock(PDS, filenameE)
 % SYNCOPENEPHYSCLOCK synchronizes the pdlaps PTB clock with open-ephys recording
-% [OE2PTBfit, OE2PTB,PTB2OE, maxreconstructionerror ] = syncOpenEphysClock(PDS, filenameE)
+% Inputs:
+%   PDS       - PDS struct (or cell-array of PDS structs)
+%   filenameE - string (or cell-array of strings) path to OE events file (*.kwe, *.events)
+% Outputs:
+%   OE2PTBfit - parameters of fit
+%   OE2PTB@function_handle - converts OE time to PTB time
+%   PTB2OE@function_handle - convers PTB time to OE time
+%   maxreconstructionerror - maximum error in the synchonization
+% Example Call:
+%   [OE2PTBfit, OE2PTB,PTB2OE, maxreconstructionerror ] = syncOpenEphysClock(PDS, filenameE)
+
+% 2017.08.14     jly     modified Jonas' version
 
 % handling of multiple files
 if ~iscell(PDS)
@@ -68,7 +79,7 @@ end
 
 [~, hind]=ismember(datenum(sixletsPTB),datenum(sixletsOE));
 if any(hind==0)
-    warning('some strobes were missed\n')
+    warning('sync2OeClock: some strobes were missed')
 end
 goodPTBindex=hind~=0;
 hind(hind==0)=[];
@@ -86,6 +97,6 @@ OE2DP=@(x) x*OE2DPfit(1) + OE2DPfit(2);
 % DP2OE=@(x) (x - OE2DPfit(2))/OE2DPfit(1);
 
 
-%maybe get a reconstruction estimate
+% get a reconstruction estimate
 % mean(abs(((sixletsDPts(:)-OE2DP(sixletsOEts(:))))))
 maxreconstructionerror = max(((sixletsDPts(:)-OE2DP(sixletsOEts(:)))));

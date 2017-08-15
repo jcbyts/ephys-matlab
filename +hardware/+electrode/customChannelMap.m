@@ -1,15 +1,15 @@
-classdef SingleElectrodes < hardware.electrode.probe
-    
+classdef customChannelMap < hardware.electrode.probe
+    % specify a custom channel map
     properties
     end
     
     methods        
-        function p = SingleElectrodes(chanMap, varargin)
+        function p = customChannelMap(chanMap, varargin)
             p@hardware.electrode.probe(varargin); % base class constructor
             
             Nchan = numel(chanMap);
             
-            p.name = 'SingleElectrodes';
+            p.name = 'customChannelMap';
             p.manufacturer = '??';
             p.design       = '??';
             p.num          = '??';
@@ -17,10 +17,10 @@ classdef SingleElectrodes < hardware.electrode.probe
             p.ycoords      = zeros(Nchan,1);
             p.zcoords      = zeros(Nchan,1);
             p.channelMap   = chanMap;
-            p.connector    = 'Omnetics36';
+            p.connector    = '??';
             p.material     = '??';
             p.impedence    = nan;
-            p.headstages   = hardware.headstage.blank32;
+            p.headstages   = {hardware.headstage.blank32};
             
         end
         

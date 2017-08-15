@@ -1,42 +1,35 @@
-function ops = oe2dat(oepath, varargin)
-% ops = oe2dat(oepath, varargin)
+function [ops, info] = oe2dat(oepath, shanks, varargin)
+% ops = oe2dat(oepath, shanks, varargin)
 % Inputs:
 %   oepath@string - full path to the data
+%   shanks@cell   - array of electrodes used
+%
 % Optional Inputs (argument pairs):
-%   'headstages'  - cell-array of headstage objects
-%                  eg., {hardware.headstage.intan_RHD2132}
-%   'electrodes'  - cell-array of probe objects
-%                  eg., {hardware.electrode.Shank2}
+ops = [];
+
+if nargin < 2
+    shanks{1}.name = 'dummy';
+end
+
+numShanks  = numel(shanks);
+shankPaths = cell(numShanks,1);
+for i = 1:numShanks
+    shankPaths{i} = sprintf('_shank%02.0f_%s', i, shanks{i}.name);
+end
 
 % --- parse optional arguments
 ip = inputParser();
-ip.addParameter('headstages', {})
-ip.addParameter('electrodes', {})
 ip.parse(varargin{:});
 
 % -------------------------------------------------------------------------
 % Setup for data conversion
 
 
-% --- declare constants
-NUM_HEADER_BYTES    = 1024; % size of header for each analog file
-SAMPLES_PER_RECORD  = 1024;
-BLOCK_BYTES         = 2070; % see load_open_ephys_data_faster for how this is calculated
-
-% --- name of output files
-fephys  = fullfile(oepath, 'ephys.dat');        % raw data (binary file)
-fops    = fullfile(oepath, 'ops.mat');          % spike-sorting struct
-finfo   = fullfile(oepath, 'ephys_info.mat');   % meta data about the binary
+% --- save session info
 fsess   = fullfile(oepath, 'session_info.mat'); % meta data about the session
 
-% --- Exit if this has already been run
-if exist(fsess, 'file')
-    ops = io.loadOps(oepath);
-    return
-end
-
 % --- build meta data about session (Subject, Data, Time, Note, Path)
-sessionInfo = struct('subject', [], 'dateNum', [], 'date', [], 'time', [], 'note', []);
+sessionInfo = struct('subject', [], 'dateNum', [], 'date', [], 'time', [], 'note', [], 'nShanks', []);
 
 % extract session info from directory naming convention
 pat = '(?<subject>\D+)\_(?<date>[\d-]+)\_(?<time>[\d-]+)\_(?<note>[^]+)';
@@ -49,32 +42,70 @@ sessionInfo.date    = datestr(sessionInfo.dateNum, 'yyyy-mm-dd');
 sessionInfo.time    = datestr(sessionInfo.dateNum, 'HH:MM:SS');
 sessionInfo.note    = s.note;
 sessionInfo.path    = oepath;
-
-% Note: oe2dat will import ALL channels. I know that is not an efficient
-% use of hard-disk space, but until we build in more sophisticated measures
-% to select channels, this is the most robust way to ensure that no data is
-% ever lost.
-fl  = dir(fullfile(sessionInfo.path, '*CH*.continuous'));
-str = 'CH(\d+)';
-chlist = cellfun(@(x) cell2mat(regexp(x, str, 'match')) , {fl.name}, 'UniformOutput', false);
-
-sessionInfo.channels = unique(cellfun(@(x) str2double(x(3:end)), chlist));
-sessionInfo.numChannels = numel(sessionInfo.channels);
-sessionInfo.ops         = dir(fullfile(sessionInfo.path, 'ops.mat'));
+sessionInfo.nShanks = numShanks;
+for i = 1:numShanks
+    sessionInfo.shankPaths{i} = fullfile(sessionInfo.path, shankPaths{i});
+    if ~exist(sessionInfo.shankPaths{i}, 'dir')
+        mkdir(sessionInfo.shankPaths{i})
+    end
+end
 
 save(fsess, 'sessionInfo')
 
-numChannels = sessionInfo.numChannels;
+maxChan = 0;
+% --- loop over shanks and import
+clear ops
 
-% --- Get list of recordings for each channel
-% OpenEphys saves each channel's data separately. Each time the recording
-% is paused it starts a new file. This checks for all recordings from this
-% session for each channel.
+for iShank = 1:numShanks
+    
+    % combine headstages if more than one
+    if numel(shanks{iShank}.headstages) == 1
+        headstage = shanks{iShank}.headstages{1};
+    else
+        headstage = combineHeadstages(shanks{iShank}.headstages);
+    end
+   
+   % build channel map
+   chanMap = headstage.channelMap(shanks{iShank}.channelMap) + maxChan;
+   xcoords = shanks{iShank}.xcoords;
+   ycoords = shanks{iShank}.ycoords;
+   zcoords = shanks{iShank}.zcoords;
+   
+   [ops(iShank), info(iShank)] = oe2dat_helper(oepath, shankPaths{iShank}, chanMap, xcoords, ycoords, zcoords); %#ok<NASGU>
+   
+   maxChan = maxChan + max(headstage.channelMap);
+end
+
+
+
+function [ops, info] = oe2dat_helper(oepath, shankName, chanMap, xcoords, ycoords, zcoords) %#ok<INUSD>
+
+% --- declare constants
+NUM_HEADER_BYTES    = 1024; % size of header for each analog file
+SAMPLES_PER_RECORD  = 1024;
+BLOCK_BYTES         = 2070; % see load_open_ephys_data_faster for how this is calculated
+
+% --- name of output files
+fephys  = fullfile(oepath, shankName, 'ephys.dat');        % raw data (binary file)
+fops    = fullfile(oepath, shankName, 'ops.mat');          % spike-sorting struct
+finfo   = fullfile(oepath, shankName, 'ephys_info.mat');   % meta data about the binary
+
+% --- Exit if this has already been run
+if exist(fops, 'file')
+    ops  = load(fops);
+    info = load(finfo);
+    return
+end
+
+numChannels = numel(chanMap);
+
 fs = cell(numChannels,1);
 for j = 1:numChannels
-    tmp = dir(fullfile(oepath, sprintf('*CH%d.continuous',j) ));
+    ch = chanMap(j);
+    
+    tmp = dir(fullfile(oepath, sprintf('*CH%d.continuous',ch) ));
     % if separate files are saved by open ephys gui
-    tmp_ = dir(fullfile(oepath, sprintf('*CH%d_*.continuous', j) ));
+    tmp_ = dir(fullfile(oepath, sprintf('*CH%d_*.continuous', ch) ));
     
     fs{j} = [tmp tmp_];
 end
@@ -238,103 +269,31 @@ fprintf('Done [%02.2fs]\n', toc)
 
 % --- build ops
 ops = struct();
-ops.root    = oepath;
+ops.root    = fullfile(oepath, shankName);
 ops.fbinary = fullfile(ops.root, 'ephys.dat');
 
-% % --- build channel map info
-% numHeadstages = numel(ip.Results.headstages);
-% numProbes     = numel(ip.Results.electrodes);
-% 
-% nElectrodeChannels = zeros(numProbes,1);
-% for iProbe = 1:numProbes
-% 	nElectrodeChannels(iProbe) = numel(ip.Results.electrodes{iProbe}.channelMap);
-% end
-% 
-% nHeadstageChannels = zeros(numHeadstages,1);
-% for iHeadstage = 1:numHeadstages
-%     nHeadstageChannels(iHeadstage) = sum(~isnan(ip.Results.headstages{iHeadstage}.channelMap));
-% end
-% 
-% assert(nElectrodeChannels <= sum(nHeadstageChannels), 'More channels listed than are supported by headstage')
-% 
-% iHeadstage = 1;
-% chanMap = [];
-% % build new combined headstage
-% % handles.ops.headstage.mapChannels(handles.ops.probe)
-% 
-% %%
-% headstage = hardware.headstage.headstage;
-% electrode = hardware.electrode.probe;
-% 
-% 
-% chOffset = zeros(numHeadstages,1);
-% chCount  = zeros(numHeadstages,1);
-% for iHeadstage = 1:numHeadstages
-%     headstage.name         = [headstage.name ip.Results.headstages{iHeadstage}.name ','];
-%     headstage.manufacturer = [headstage.manufacturer ip.Results.headstages{iHeadstage}.manufacturer ','];
-%     headstage.model        = [headstage.model ip.Results.headstages{iHeadstage}.model ','];
-%     headstage.connector    = [headstage.connector ip.Results.headstages{iHeadstage}.connector ','];
-%     headstage.filter       = [headstage.filter; ip.Results.headstages{iHeadstage}.filter];
-%     headstage.samplingRate = [headstage.samplingRate ip.Results.headstages{iHeadstage}.samplingRate];
-%     headstage.gains        = [headstage.gains ip.Results.headstages{iHeadstage}.gains];
-%     tmp = max(headstage.channelMap);
-%     if isempty(tmp)
-%         chOffset(iHeadstage) = 0;
-%     else
-%         chOffset(iHeadstage) = tmp;
-%     end
-%     headstage.channelMap = [headstage.channelMap ip.Results.headstages{iHeadstage}.channelMap + chOffset(iHeadstage)];
-%     chCount(iHeadstage)  = numel(ip.Results.headstages{iHeadstage}.channelMap);
-% end
-% 
-% % remove comma at end
-% headstage.name(end) = [];
-% headstage.manufacturer(end) = [];
-% headstage.model(end) = [];
-% headstage.connector(end) = [];
-% 
-% headstage
-% 
-% maxProbeChannel = 0;
-% for iProbe = 1:numProbes
-%    nChannelsUsed = numel(ip.Results.electrodes{iProbe}.channelMap);
-%    electrode.name         = [electrode.name ip.Results.electrodes{iProbe}.name ','];
-%    electrode.manufacturer = [electrode.manufacturer ip.Results.electrodes{iProbe}.manufacturer ','];
-%    electrode.design       = [electrode.design ip.Results.electrodes{iProbe}.design ','];
-%    electrode.num          = [electrode.name ip.Results.electrodes{iProbe}.num ','];
-%    electrode.connector    = [electrode.connector ip.Results.electrodes{iProbe}.connector ','];
-%    electrode.material     = [electrode.material ip.Results.electrodes{iProbe}.material ','];
-%    
-%    electrode.xcoords     = [electrode.xcoords; ip.Results.electrodes{iProbe}.xcoords(:)];
-%    electrode.ycoords     = [electrode.ycoords; ip.Results.electrodes{iProbe}.ycoords(:)];
-%    electrode.zcoords     = [electrode.zcoords; ip.Results.electrodes{iProbe}.zcoords(:)];
-%    
-%    electrode.channelMap  = [electrode.channelMap ip.Results.electrodes{iProbe}.channelMap + maxProbeChannel];
-% end
-% 
-% electrode.name(end) = [];
-% electrode.manufacturer(end) = [];
-% electrode.design(end) = [];
-% electrode.num(end) = [];
-% electrode.connector(end) = [];
-% electrode.material(end) = [];
-%%
-ops.Nchan   = numChannels;
+ops.Nchan          = numChannels;
 ops.nSamplesBlocks = nSamplesBlocks;
-ops.bitVolts = info.bitVolts;
-ops.fs =info.sampleRate;
+ops.bitVolts       = info.bitVolts;
+ops.fs             = info.sampleRate;
 
-% --- Parameters  parameters
-
-ops.datatype            = 'dat';  % binary ('dat', 'bin') or 'openEphys'
-ops.fproc               = fullfile(oepath, 'tempWh.dat'); % residual from RAM of preprocessed data				
+% --- Parameters for KiloSort
+ops.datatype            = 'dat';  % binary
+ops.fproc               = fullfile(ops.root, 'tempWh.dat'); % residual from RAM of preprocessed data				
 % define the channel map as a filename (string) or simply an array
-ops.chanMap             = fullfile(oepath, 'chanMap.mat'); % make this file using createChannelMapFile.m
-if ~exist(ops.chanMap, 'file')
-	ops.chanMap = 1:ops.Nchan; % treated as linear probe if unavailable chanMap file
-end
+ops.chanMap             = fullfile(ops.root, 'chanMap.mat'); % make this file using createChannelMapFile.m
 
-ops.Nfilt               = 2*(ops.Nchan+32-mod(ops.Nchan,32));  % number of clusters to use (2-4 times more than Nchan, should be a multiple of 32)     		
+chanMap   = 1:numChannels;
+connected = true(size(xcoords));
+fs        = ops.fs;
+
+save(ops.chanMap, 'chanMap', 'xcoords', 'ycoords', 'zcoords', 'connected', 'fs');
+% if ~exist(ops.chanMap, 'file')
+% 	ops.chanMap = 1:ops.Nchan; % treated as linear probe if unavailable chanMap file
+% end
+
+% default number of clusters
+ops.Nfilt               = 4*(ops.Nchan+32-mod(ops.Nchan,32));  % number of clusters to use (2-4 times more than Nchan, should be a multiple of 32)     		
 ops.nNeighPC            = 12; % visualization only (Phy): number of channnels to mask the PCs, leave empty to skip (12)		
 ops.nNeigh              = 16; % visualization only (Phy): number of neighboring templates to retain projections of (16)		
 		
@@ -348,12 +307,12 @@ ops.criterionNoiseChannels = 0.2; % fraction of "noise" templates allowed to spa
 % other options for controlling the model and optimization		
 ops.Nrank               = 3;    % matrix rank of spike template model (3)		
 ops.nfullpasses         = 6;    % number of complete passes through data during optimization (6)		
-ops.maxFR               = 40000;  % maximum number of spikes to extract per batch (20000)		
+ops.maxFR               = 500000;  % maximum number of spikes to extract per batch (20000)		
 ops.NotchFilter60       = false;
 ops.softwareReferencing = 'none';
 ops.fshigh              = 300;   % frequency for high pass filtering		
 % ops.fslow             = 2000;   % frequency for low pass filtering (optional)
-ops.artifactThresh      = 150;
+ops.artifactThresh      = 300;
 ops.artifactNchans      = 12;
 
 ops.ntbuff              = 64;    % samples of symmetrical buffer for whitening and spike detection		
@@ -364,8 +323,8 @@ ops.NT                  = 128*1024+ ops.ntbuff;% this is the batch size (try dec
 % the following options can improve/deteriorate results. 		
 % when multiple values are provided for an option, the first two are beginning and ending anneal values, 		
 % the third is the value used in the final pass. 		
-ops.Th               = [6 12 12];    % threshold for detecting spikes on template-filtered data ([6 12 12])		
-ops.lam              = [10 30 30];   % large means amplitudes are forced around the mean ([10 30 30])		
+ops.Th               = [4 10 10]; %[6 12 12];    % threshold for detecting spikes on template-filtered data ([6 12 12])		
+ops.lam              = [5 20 20]; %[10 30 30];   % large means amplitudes are forced around the mean ([10 30 30])		
 ops.nannealpasses    = 4;            % should be less than nfullpasses (4)		
 ops.momentum         = 1./[20 1000];  % start with high momentum and anneal (1./[20 1000])		
 ops.shuffle_clusters = 1;            % allow merges and splits during optimization (1)		
@@ -374,7 +333,7 @@ ops.splitT           = .1;           % lower threshold for splitting (.1)
 		
 % options for initializing spikes from data		
 ops.initialize      = 'fromData';    %'fromData' or 'no'		
-ops.spkTh           = -6;      % spike threshold in standard deviations (4)		
+ops.spkTh           = -4;      % spike threshold in standard deviations (4)		
 ops.loc_range       = [3  1];  % ranges to detect peaks; plus/minus in time and channel ([3 1])		
 ops.long_range      = [30  6]; % ranges to detect isolated peaks ([30 6])		
 ops.maskMaxChannels = 5;       % how many channels to mask up/down ([5])		
@@ -398,11 +357,45 @@ end
 
 save(fops, '-v7.3', '-struct', 'ops')
 
-
-end
-
 function info = getHeader(hdr)
 eval(char(hdr'));
 info.header = header;
+
+function [headstage] = combineHeadstages(headstages)
+
+% --- build channel map info
+numHeadstages = numel(headstages);
+
+nHeadstageChannels = zeros(numHeadstages,1);
+for iHeadstage = 1:numHeadstages
+    nHeadstageChannels(iHeadstage) = sum(~isnan(headstages{iHeadstage}.channelMap));
 end
 
+% build new combined headstage
+headstage = hardware.headstage.headstage;
+
+chOffset = zeros(numHeadstages,1);
+chCount  = zeros(numHeadstages,1);
+for iHeadstage = 1:numHeadstages
+    headstage.name         = [headstage.name headstages{iHeadstage}.name ','];
+    headstage.manufacturer = [headstage.manufacturer headstages{iHeadstage}.manufacturer ','];
+    headstage.model        = [headstage.model headstages{iHeadstage}.model ','];
+    headstage.connector    = [headstage.connector headstages{iHeadstage}.connector ','];
+    headstage.filter       = [headstage.filter; headstages{iHeadstage}.filter];
+    headstage.samplingRate = [headstage.samplingRate headstages{iHeadstage}.samplingRate];
+    headstage.gains        = [headstage.gains headstages{iHeadstage}.gains];
+    tmp = max(headstage.channelMap);
+    if isempty(tmp)
+        chOffset(iHeadstage) = 0;
+    else
+        chOffset(iHeadstage) = tmp;
+    end
+    headstage.channelMap = [headstage.channelMap headstages{iHeadstage}.channelMap + chOffset(iHeadstage)];
+    chCount(iHeadstage)  = numel(headstages{iHeadstage}.channelMap);
+end
+
+% remove comma at end
+headstage.name(end) = [];
+headstage.manufacturer(end) = [];
+headstage.model(end) = [];
+headstage.connector(end) = [];

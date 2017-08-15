@@ -1,11 +1,23 @@
 function [data, timestamps, info] = getLFP(ops, plotIt)
+% GET LFP gets the lfp from a specific recording shank specified by an ops
+% It will import the lfp and remove line noise if this is the first time it
+% is called.
+% Inputs:
+%   ops@struct     - the ops struct from a single recording shank
+%   plotIt@logical - boolean. plots line noise estimation during import.
+% Output:
+%   data@double       - nSamples x nChannels data (in mV)
+%   timestamps@double - nSamples x 1 time (in OE time)
+%   info@str
 % [data, timestamps, info] = getLFP(ops, showOutput)
+
+% 2017.08.14    jly     wrote it
 
 if nargin < 2
     plotIt = true;
 end
 
-[~, ~, info] = io.loadSession(ops.root);
+info = io.loadEphysInfo(ops);
 
 flfp     = fullfile(ops.root, 'lfp.dat');
 flfpInfo = fullfile(ops.root, 'lfp_info.mat');

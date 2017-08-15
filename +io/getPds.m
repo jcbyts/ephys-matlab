@@ -1,4 +1,19 @@
 function PDS = getPds(sessionInfo)
+% GET PDS loads PLDAPS files and synchronizes with the OE clock
+% Inputs:
+%   SessionInfo@struct - session info struct from io.loadSession(oepath)
+% Outputs:
+%   PDS@cell    - array of PDS structs
+% Example call:
+%   PDS = io.getPds(sessionInfo)
+
+% 2017.08.14    jly     wrote it
+
+behaviorDir = fullfile(sessionInfo.path, '_behavior');
+if exist(behaviorDir, 'dir')
+    load(fullfile(behaviorDir, 'PDS.mat'));
+    return
+end
 
 pdsList = io.getPdsFileList(sessionInfo);
 
@@ -51,4 +66,10 @@ PDS = PDS(id);
 
 nT = cellfun(@(x) numel(x.data), PDS);
 PDS(nT==1) = [];
+
+if ~exist(behaviorDir, 'dir')
+    mkdir(behaviorDir)
+end
+
+save(fullfile(behaviorDir, 'PDS.mat'), 'PDS')
 

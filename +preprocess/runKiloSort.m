@@ -9,10 +9,6 @@ ip.addOptional('showfigures', true)
 
 ip.parse(varargin{:});
 
-if nargin < 2
-    merge = false;
-end
-
 fprintf('-----------------------------------------------------------------\n')
 fprintf('-----------------------------------------------------------------\n')
 fprintf('-----------------------------------------------------------------\n')
@@ -32,17 +28,10 @@ ops.showfigures = ip.Results.showfigures;
 if ops.GPU
     fprintf('Using GPU for faster processing\n')
     fprintf('Opening gpuDevice. If this is the first time this was run during \nthis matlab session, this can be very slow\n')
-    gpuDevice(1); % initialize GPU (will erase any existing GPU arrays)
+    gpu = gpuDevice(1); % initialize GPU (will erase any existing GPU arrays)
+%     gpu = parallel.gpu.GPUDevice.getDevice(1);
+%     ops.ForceMaxRAMforDat = gpu.AvailableMemory;
 end
-
-% [path_to, file, ext]=fileparts(ops.fbinary);
-% fOut=fullfile(path_to, [file '_hp' ext]);
-% 
-% % if ~exist(fOut, 'file')
-% %     ops = removeArtifacts(ops);
-% % end
-% 
-% ops.fbinary = fOut;
 
 % main spike-sorting routine
 [rez, DATA, uproj] = preprocessData(ops); % preprocess data and extract spikes for initialization
@@ -65,3 +54,7 @@ rezToPhy(rez, ops.root);
 
 % remove temporary file
 delete(ops.fproc);
+
+if ops.GPU
+    reset(gpu)
+end

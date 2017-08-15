@@ -1,5 +1,8 @@
 function sp = getSpikesFromKilo(ops, info)
 
+if nargin < 2
+    info = load(fullfile(ops.root, 'ephys_info.mat'));
+end
 
 load(ops.chanMap)
 folderNames = {ops.root};
@@ -60,18 +63,34 @@ tempScalingAmps = readNPY(fullfile(folderNames{f},  'amplitudes.npy'));
 %
 % Note this function is included in the folder with this data (and also the
 % "spikes" repository)
-[cids, cgs] = readClusterGroupsCSV(fullfile(folderNames{f},  'cluster_groups.csv'));
+fname = fullfile(folderNames{f},  'cluster_groups.csv');
+if exist(fname, 'file')
+    [cids, cgs] = readClusterGroupsCSV(fname);
+    
+    % find and discard spikes corresponding to noise clusters
+    noiseClusters = cids(cgs==0);
+    
+    st = st(~ismember(clu, noiseClusters));
+    ss = ss(~ismember(clu, noiseClusters));
+    spikeTemplates = spikeTemplates(~ismember(clu, noiseClusters));
+    tempScalingAmps = tempScalingAmps(~ismember(clu, noiseClusters));
+    clu = clu(~ismember(clu, noiseClusters));
+    cgs = cgs(~ismember(cids, noiseClusters));
+    cids = cids(~ismember(cids, noiseClusters));
+else
+    cids = unique(clu);
+end
 
-% find and discard spikes corresponding to noise clusters
-noiseClusters = cids(cgs==0);
+[cgs2, uQ, cR, isiV] = sqKilosort.computeAllMeasures(folderNames{f});
+bad = cgs2==0;
+cgs2(bad) = [];
+uQ(bad) = [];
+cR(bad) = [];
+isiV(bad) = [];
 
-st = st(~ismember(clu, noiseClusters));
-ss = ss(~ismember(clu, noiseClusters));
-spikeTemplates = spikeTemplates(~ismember(clu, noiseClusters));
-tempScalingAmps = tempScalingAmps(~ismember(clu, noiseClusters));
-clu = clu(~ismember(clu, noiseClusters));
-cgs = cgs(~ismember(cids, noiseClusters));
-cids = cids(~ismember(cids, noiseClusters));
+if ~exist('cgs', 'var')
+    cgs = cgs2;
+end
 
 % temps are the actual template waveforms. It is nTemplates x nTimePoints x
 % nChannels (in this case 1536 x 82 x 374). These should be basically
@@ -114,17 +133,13 @@ sp(f).tempAmps = tempAmps;
 sp(f).spikeDepths = spikeDepths;
 sp(f).tempsUnW = tempsUnW;
 
-[cgs, uQ, cR, isiV] = sqKilosort.computeAllMeasures(folderNames{f});
-bad = cgs==0;
-cgs(bad) = [];
-uQ(bad) = [];
-cR(bad) = [];
-isiV(bad) = [];
-assert(all(sp(f).cgs == cgs), 'Quality Rating does not match')
-sp(f).cgs2 = cgs;
+
+assert(all(sp(f).cgs == cgs2), 'Quality Rating does not match')
+sp(f).cgs2 = cgs2;
 sp(f).uQ = uQ;
 sp(f).cR = cR;
 sp(f).isiV = isiV;
+
 end
 
 
@@ -153,6 +168,9 @@ for s = 1:numel(folderNames)
     sp(s).clusterDepths = clusterDepths';
     sp(s).clusterAmps = clusterAmps';
     sp(s).firingRates = spikeCounts'./recordingDuration;
+    
+    sptmp = sp(s);
+    save(fullfile(folderNames{s}, 'sp.mat'), '-v7.3', '-struct', 'sptmp');
     
 end
 

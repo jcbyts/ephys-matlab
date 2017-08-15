@@ -14,6 +14,7 @@ classdef probe < handle
         connector@char
         material@char
         impedence@double
+        headstages@cell
     end
     
     methods
