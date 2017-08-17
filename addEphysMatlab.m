@@ -14,6 +14,7 @@ dirs{7}  = fullfile(reposDir, 'pdstools');   % useful matlab functions for ephys
 dirs{8}  = fullfile(reposDir, 'ncclabcode'); % general useful matlab functions
 dirs{9}  = fullfile(reposDir, 'PLDAPS');     % stimulus generation
 dirs{10} = fullfile(reposDir, 'edfmex');      % mex file for reading edf
+dirs{11}  = fullfile(reposDir, 'pds-stimuli');
 % dirs{10}  = fullfile(reposDir, 'PLDAPStools'); % tools for interacting with PDLAPS
 
 % warning off % turn warnings off

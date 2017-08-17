@@ -36,14 +36,22 @@ for iCh = 1:nChannels
     wf = ephys.spikeSorting.extractWaveforms(data(:,iCh), ss);
     
     b = ephys.spikeSorting.extractFeatures(wf);
-    
-    df = 3; % degrees of freedom
-    model = ephys.spikeSorting.MixtureModel.fit(b, df, 'verbose', true);
-    results.s = ss;
-    results.w = wf;
-    results.b = b;
-    results.model = model;
-    
+    try
+        df = 3; % degrees of freedom
+        model = ephys.spikeSorting.MixtureModel.fit(b, df, 'verbose', true);
+        results.s = ss;
+        results.w = wf;
+        results.b = b;
+        results.model = model;
+    catch
+        fprintf('Mixture model failed. Trying Gaussian model\n')
+        df = inf; % degrees of freedom
+        model = ephys.spikeSorting.MixtureModel.fit(b, df, 'verbose', true);
+        results.s = ss;
+        results.w = wf;
+        results.b = b;
+        results.model = model;
+    end
     X0 = ephys.spikeSorting.keepMaxClusters(results, size(data,1), .6);
     
     nUnits = size(X0,2);
@@ -56,7 +64,7 @@ for iCh = 1:nChannels
         spikeSampleTimes = ss(clu==iUnit);
         nSpikes = numel(spikeSampleTimes);
         wf = ephys.spikeSorting.extractWaveforms(data(:,iCh), spikeSampleTimes);
-        plot(wf(:,1:(nSpikes/1e3):end), 'Color', cmap(iUnit,:));
+        plot(wf(:,1:ceil(nSpikes/500):end), 'Color', cmap(iUnit,:));
         bins = 0:(Fs/1e3):ceil(.15*Fs);
         cnt = histc(diff(spikeSampleTimes), bins);
         cnt = cnt./sum(cnt);
@@ -74,7 +82,22 @@ for iCh = 1:nChannels
 end
 
 %% save spikes
-sp.st = io.convertSamplesToTime(sp.ss, Fs, info.timestamps, info.fragments);
+sp.st = io.convertSamplesToTime(sp.ss, Fs, info.timestamps(:), info.fragments(:));
 sp.cids = unique(sp.clu)';
+
+load(ops.chanMap)
+sp.yc = ycoords;
+sp.ycoords = ycoords;
+sp.xc = xcoords;
+sp.xcoords = xcoords;
+n = numel(sp.cids);
+sp.cgs = zeros(n,1);
+sp.cgs2= zeros(n,1);
+sp.cR  = zeros(n,1);
+sp.clusterAmps   = zeros(1,n);
+sp.clusterDepths = zeros(1,n);
+sp.firingRates   = zeros(1,n);
+sp.isiV = zeros(1,n);
+
 
 save(fullfile(ops.root, 'sp.mat'), '-v7.3', '-struct', 'sp')

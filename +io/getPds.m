@@ -1,4 +1,4 @@
-function PDS = getPds(sessionInfo)
+function PDS = getPds(sessionInfo, overwrite)
 % GET PDS loads PLDAPS files and synchronizes with the OE clock
 % Inputs:
 %   SessionInfo@struct - session info struct from io.loadSession(oepath)
@@ -9,10 +9,16 @@ function PDS = getPds(sessionInfo)
 
 % 2017.08.14    jly     wrote it
 
+if nargin < 2
+    overwrite = false;
+end
+
 behaviorDir = fullfile(sessionInfo.path, '_behavior');
-if exist(behaviorDir, 'dir')
-    load(fullfile(behaviorDir, 'PDS.mat'));
-    return
+try
+    if exist(behaviorDir, 'dir') && ~overwrite
+        load(fullfile(behaviorDir, 'PDS.mat'));
+        return
+    end
 end
 
 pdsList = io.getPdsFileList(sessionInfo);

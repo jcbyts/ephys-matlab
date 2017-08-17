@@ -34,8 +34,12 @@ oepath = uigetdir
 %%
 [session, ops, info] = io.loadSession(oepath);
 
+info.timestamps = info.timestamps/info.sampleRate;
+info.timestamps = info.timestamps*datenum(0000,00,00,00,00,1) + info.dateNum;
+
 PDS = io.getPds(session);
 
+%%
 [data, timestamps, elInfo] = io.getEdf(ops, PDS);
 
 sp = io.getSpikesFromKilo(ops, info);
@@ -444,8 +448,7 @@ for kUnit = 1:nUnits
     
     % STA
     % sta =
-    ttsta = (Xd'*Xd + 10e1*speye(size(Xd,2)))\(Xd'*y);
-%     ttsta = (Xd'*y);
+    ttsta = (Xd'*Xd + 10e2*speye(size(Xd,2)))\(Xd'*y);
     RF{kUnit} =  ttsta(1:end-1);
     sta =reshape(RF{kUnit}, ntk, []);
  

@@ -40,10 +40,10 @@ shank{1}.name = 'V1';
 % headstage 2, this should be channel 4 (relative to the start of
 % headstage 2)
 
-% list single electrode channels (this can be a vector if > 1 electrode used)
-% chanMap = 4;
-% shank{2} = hardware.electrode.customChannelMap(chanMap);
-% shank{2}.name = 'MtBurrHoleMapping';
+% % list single electrode channels (this can be a vector if > 1 electrode used)
+chanMap = 4;
+shank{2} = hardware.electrode.customChannelMap(chanMap);
+shank{2}.name = 'MtBurrHoleMapping';
 % If you chose hardware.electrode.customChannelMap(chNum), the channel map
 % will be chanMap. That's it. No specifying headstage necessary.
 
@@ -90,13 +90,13 @@ for i = 1:numel(shanksToSortWithKilo)
     fprintf('cd %s\n', ops(iShank).root)
     fprintf('phy template-gui params.py\n')
     commandwindow
-    pause(1)
+    pause(10)
     fprintf('\n\n')
     fprintf('For keyboard shortcuts and sorting instructions, go to:\n')
     fprintf('http://phy-contrib.readthedocs.io/en/latest/template-gui/#keyboard-shortcuts\n')
     
     fprintf('importing spikes to matlab\n')
-    io.getSpikesFromKilo(ops(iShank))
+    io.getSpikesFromKilo(ops(iShank));
 end
 
 
@@ -117,7 +117,7 @@ end
 ops = io.loadOps(oepath);
 
 for i = 1:numel(ops)
-    io.getLFP(ops);
+    io.getLFP(ops(i));
 end
 
 %% Step 5: Import PLDAPS / eyelink files
@@ -125,9 +125,9 @@ end
 % --- load session: This is central to all operations
 [sess, ops, info] = io.loadSession(oepath);
 
+overwrite = false; % if it breaks, run again with true 
+PDS = io.getPds(sess, overwrite);
 
-PDS = io.getPds(sess);
 
-overwrite = false; 
 [data, timestamps, elInfo] = io.getEdf(sess, PDS, overwrite);
 

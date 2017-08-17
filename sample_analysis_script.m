@@ -8,7 +8,7 @@ addEphysMatlab
 
 %% set session directory
 oepath = 'C:\Data\Ellie_2017-07-31_15-21-11_Shnkd8';
-
+oepath = 'C:\Data\Ellie_2017-08-09_13-04-23_ShankD15MT6';
 % oepath = uigetdir(); % select using GUI
 
 %% Load relevant data into the workspace
@@ -16,7 +16,7 @@ oepath = 'C:\Data\Ellie_2017-07-31_15-21-11_Shnkd8';
 
 PDS = io.getPds(sess);
 
-sp = io.getSpikes(ops, info);
+sp = io.getSpikes(sess);
 
 %% plot spike waveforms?
 nShanks = numel(ops);
@@ -108,6 +108,7 @@ th = th(ixLong(:));
 thBins = 0:30:360;
 ch0 = (1:32)*40;
 cmap = flipud(hsv(numel(thBins)));
+subplot(1,2,2)
 for i = 1:numel(thBins)-1
     
     ii = th > thBins(i) & th < thBins(i+1);
@@ -118,10 +119,13 @@ for i = 1:numel(thBins)-1
 %     plot(bc, sta-sd, '--', 'Color', cmap(i,:));
     
 end
+
 xlabel('Time from saccade')
 
 axis tight
-ax2 = axes();
+xlim([-100 200])
+yd = ylim;
+ax2 = axes('Position', get(gca, 'Position'));
 for i = 1:numel(thBins)-1
 quiver(ax2, 0, 0, cosd(mean(thBins(i + [0 1]))), sind(mean(thBins(i + [0 1]))), 'Color', cmap(i,:), 'AutoScale', 'off'); hold on
 axis off
@@ -130,6 +134,19 @@ end
 xlim([-1 10])
 ylim([-10 1])
 title('Saccade-triggered LFP')
+
+subplot(1,2,1)
+% flash triggered LFP overlayed
+flashTimes = [csdTrial.onset]';
+flashSamples = io.convertTimeToSamples(flashTimes, lfpInfo.sampleRate, lfpInfo.timestamps(:), lfpInfo.fragments(:));
+[sta,~,bc] = pdsa.eventTriggeredAverage(lfp, flashSamples, [-300 400]);
+plot(bc, bsxfun(@plus, sta, ch0), 'Color', 'k');
+axis tight
+ylim(yd)
+xlim([-100 200])
+xlabel('Time from flash')
+title('Flash-triggered LFP')
+
 
 figure(3); clf
 s = sp{iShank};
@@ -163,235 +180,94 @@ end
 
 
 
-%%
-for i = 1:nUnits
-    set(gcf, 'currentaxes', ax(i))
-    xlim([-10 50])
-end
+%% Hartley 
+hart = session.hartleyFF(PDS);
+
+% build design matrix for STA
+hart.buildDesignMatrix();
 
 
-
-%%
-stim = 'hartley';
-
-hasStim = io.findPDScontainingStimModule(PDS, stim);
-
-hartleyTrial = struct();
-trialNum = 0;
-
-for i = find(hasStim(:)')
-    
-    trialIx = cellfun(@(x) isfield(x, stim), PDS{i}.data); 
-    
-    stimTrials = find(trialIx);
-    
-    if isempty(stimTrials)
-        continue
-    end
-        
-    kxs=PDS{i}.data{stimTrials(1)}.hartley.kxs;
-    kys=PDS{i}.data{stimTrials(1)}.hartley.kys;
-    
-   
-    for j = 1:numel(stimTrials)
-        thisTrial = stimTrials(j);
-    
-        kTrial = trialNum + j;
-        
-        hartleyTrial(kTrial).frameTimes = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,1:end-1));
-        hartleyTrial(kTrial).start      = hartleyTrial(kTrial).frameTimes(1);
-        hartleyTrial(kTrial).duration   = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,end-1)) - hartleyTrial(kTrial).start;
-    
-        if isfield(PDS{i}.conditions{thisTrial}, stim)
-            if isfield(PDS{i}.conditions{thisTrial}.(stim), 'setupRNG')
-                if strcmp(PDS{i}.conditions{thisTrial}.(stim).setupRNG, 'frozenSequence')
-                    hartleyTrial(kTrial).frozenSequence = true;
-                    hartleyTrial(kTrial).frozenSequenceLength = PDS{i}.conditions{thisTrial}.(stim).sequenceLength;
-                else
-                    hartleyTrial(kTrial).frozenSequence = false;
-                    hartleyTrial(kTrial).frozenSequenceLength = nan;
-                end
-            
-            else
-                hartleyTrial(kTrial).frozenSequence = false;
-                hartleyTrial(kTrial).frozenSequenceLength = nan;
-            end
-            
-        else
-                hartleyTrial(kTrial).frozenSequence = false;
-                hartleyTrial(kTrial).frozenSequenceLength = nan;
-        end
-        
-        hartleyTrial(kTrial).kx         = PDS{i}.data{thisTrial}.(stim).kx;
-        hartleyTrial(kTrial).ky         = PDS{i}.data{thisTrial}.(stim).ky;
-        hartleyTrial(kTrial).on         = PDS{i}.data{thisTrial}.(stim).on;
-        
-        eyepos = io.getEyePosition(PDS{i}, thisTrial);
-        hartleyTrial(kTrial).eyeSampleTime = eyepos(:,1);
-        hartleyTrial(kTrial).eyeXPx        = eyepos(:,2);
-        hartleyTrial(kTrial).eyeYPx        = eyepos(:,3);
-        hartleyTrial(kTrial).pupilArea     = eyepos(:,4);
-    end
-    
-    trialNum = kTrial;
-    
-end
-
-%%
-flipTimes = cell2mat(arrayfun(@(x) x.frameTimes, hartleyTrial, 'UniformOutput', false))';
-kx        = cell2mat(arrayfun(@(x) x.kx', hartleyTrial, 'UniformOutput', false))';
-ky        = cell2mat(arrayfun(@(x) x.ky', hartleyTrial, 'UniformOutput', false))';
-on        = ~(isnan(kx) | isnan(ky));
-
-kxs = unique(kx(on));
-kys = unique(ky(on));
-
-x=arrayfun(@(x) find(x==kxs), kx(on));
-y=arrayfun(@(x) find(x==kys), ky(on));
-
-ind=sub2ind([numel(kys) numel(kxs)], y, x);
-
-
-%% Build design matrix
-
-t0 = flipTimes(1);
-binsize = PDS{1}.initialParametersMerged.display.ifi;
-binfun = @(t) (t==0) + ceil(t/binsize);
-
-stimOnset = binfun(flipTimes(on)-t0);
-% stimulus
-X = sparse(stimOnset, ind, ones(size(ind,1),1), max(stimOnset), max(ind));
-
-ntk=30;
-Xd=rfmap.makeStimRowsSparse(X, ntk);
-Xd = [Xd ones(size(X,1),1)];
-
-%% analyze RFs binned spikes
-figure(10); clf
-
-ax = pdsa.tight_subplot(nUnits,2,.001, .1, .1);
-
-for kUnit = 1:nUnits
-    
-    
-    st = s.st(s.clu==clustId(kUnit)) - t0;
-    
-    ss = binfun(st(st>0 & st < flipTimes(end)-t0));
-    ss(ss > size(X,1)) = [];
-    
-    y = sparse(ss, ones(numel(ss), 1), ones(numel(ss), 1), size(X,1), 1);
-    
-    
-    % STA
-    % sta =
-    ttsta = (Xd'*Xd + 10e2*speye(size(Xd,2)))\(Xd'*y);
-    RF{kUnit} =  ttsta(1:end-1);
-    sta =reshape(RF{kUnit}, ntk, []);
- 
-%     RF{kUnit} = fastASD(Xd(:,1:end-1), y-mean(y), [ntk max(ind)], .1);
-%     sta =reshape(RF{kUnit}, ntk, []);
-%     
-    
-    set(gcf, 'currentaxes', ax((kUnit-1)*2 + 1))
-%     sta =reshape(sta(1:end-1), ntk, []);
-%     
-    
-    [u,~,v] = svd(full(sta));
-    u(:,1) = u(:,1) - mean(u(1:5,1));
-    [~, im] = max(abs(u(:,1)));
-    sflip = sign(u(im,1));
-%     sflip = sign(sum(v(:,1)));
-    
-    
-    spatialRF{kUnit} = reshape(sflip*v(:,1), numel(kxs), numel(kys));
-    imagesc(kxs, kys, spatialRF{kUnit})
-    colormap(gray.^2)
-    % subplot(2,32,kUnit +32)
-    axis off
-    
-    set(gcf, 'currentaxes', ax((kUnit-1)*2 + 2))
-    
-    plot((1:ntk)*binsize,sflip*u(:,1), 'k-')
-    axis off
-    axis tight
-    drawnow
-end
-
-set(gcf, 'renderer', 'painters')
-% set(ax(k), 'XTick', -1:.1:.5, 'XTickLabel', -1:.1:.5, 'TickDir', 'out')
-set(gcf, 'PaperSize', [1 5], 'PaperPosition', [0 0 1 5])
-% saveas(gcf, 'hartley_RFs', 'epsc')
-
-%%
-frozenTrials = find([hartleyTrial.frozenSequence]);
-if any(frozenTrials)
-   sequenceStarts = cell2mat(arrayfun(@(x) x.frameTimes(1:x.frozenSequenceLength:end)', hartleyTrial(frozenTrials), 'UniformOutput', false)');
-   
-   cmap = lines(nUnits);
-   figure(11); clf
-   
-   for kUnit = 1:nUnits
-    st = s.st(s.clu==clustId(kUnit));
-   
-    seqLength = hartleyTrial(frozenTrials(1)).frozenSequenceLength;
-   
-   [spcnt, bcenters] = pdsa.binSpTimes(st, sequenceStarts, [0 seqLength/120], 1e-3);
-   
-   [i, j] = find(spcnt);
-   
-   uIx = s.cids==unitIds(kUnit);
-   
-   if s.uQ(uIx)>20 && s.cR(uIx) < .2
-    plot(j, i-numel(sequenceStarts)*(kUnit-1), '.', 'Color', cmap(kUnit,:)); hold on
-   else
-       plot(j, i-numel(sequenceStarts)*(kUnit-1), '.', 'Color', repmat(.5, 1, 3)); hold on
-   end
-   
-   end
-end
-
-%% ploting
-
+%% 
+iShank = 1;
+s = sp{iShank};
+clustIds = s.cids(s.uQ>1);
+nUnits = numel(clustIds);
 
 figure(1); clf
-ax = pdsa.tight_subplot(32,2,.001, .1, .1);
-
-for kUnit = 1:32
+plot.spikeWaveformsFromOps(ops(iShank), s, 'clusterIds', clustIds, 'numWaveforms', 10)
+axis off
+figure(2); clf
+ax = pdsa.tight_subplot(nUnits, 2, .01, .01);
+for kUnit = 1:nUnits
+    spikeTimes = s.st(s.clu==clustIds(kUnit));
+    
+    sta = hart.spikeTriggeredAverage(spikeTimes);
+    
+    xdat.xx = hart.design.XX;
+    xdat.xy = sta.xy;
+    xdat.yy = sta.yy;
+    xdat.ny = sta.ny;
+%     autoCorrRidgeRegress(xdat)
+%     sta = hart.AsdRf(spikeTimes);
+    [w_hat, wt, wx, wlin] = bilinearMixRegress_coordAscent(xdat.xx + 10e2*speye(size(xdat.xx,2)), xdat.xy, [hart.design.nkTime hart.design.nkx*hart.design.nky], 1, 1:size(xdat.xx,2)-1);
+    sflip = sign(sum(wt));
+    sta.RF = reshape(sflip*wx, [hart.design.nkx hart.design.nky]);
+    sta.RFtime = sflip*wt;
     set(gcf, 'currentaxes', ax((kUnit-1)*2 + 1))
-%     sta =reshape(sta(1:end-1), ntk, []);
-%     
-    
-    sta =reshape(RF{kUnit}, ntk, []);
-    [u,s,v] = svd(full(sta));
-    sflip = sign(sum(u(:,1)));
-   
-%     if 
-         imagesc(kxs, kys, sflip*spatialRF{kUnit}, .5*[-1 1])
-   
-    
-         
-    colormap gray
-    % subplot(2,32,kUnit +32)
-    axis square
-    axis off
-    
-    set(gcf, 'currentaxes', ax((kUnit-1)*2 + 2))
-    
-    plot(-(0:(ntk-1))*binsize,flipud(sflip*u(:,1)), 'k-')
-    axis off
-    axis tight
+    imagesc(sta.kxs, sta.kys, sta.RF)
+    colormap(gray.^2)
     axis xy
+    axis off
+    set(gcf, 'currentaxes', ax((kUnit-1)*2 + 2))
+    plot(sta.time, sta.RFtime)
+    axis tight
+    axis off
+    drawnow
+
+end
+%% plot frozen trials
+figure(11); clf
+hart.plotFrozenRaster(s);
+
+%% dot revco mapping
+
+mtmap = session.mtDotRcMap(PDS);
+
+mtmap.buildDesignMatrix('xwin', [-5 5], 'ywin', [-5 5], 'binSize', 1);
+
+
+%% try bilinear RF estimation
+figure(3); clf
+ax = pdsa.tight_subplot(nUnits, 2, .01, .01);
+for kUnit = 1:nUnits
+    spikeTimes = s.st(s.clu==clustIds(kUnit));
+    
+    y = histc(spikeTimes, mtmap.design.rowTimes);
+    
+    y(diff(mtmap.design.rowTimes) > 1.5*mtmap.display.ifi) = 0;
+    
+    xy = mtmap.design.Xd'*y;
+%     yy = y'*y';
+    ny = numel(y);
+    
+    [w_hat, wt, wx, wlin] = bilinearMixRegress_coordAscent(mtmap.design.XX + 10e2*speye(size(mtmap.design.XX,2)), xy, [mtmap.design.nkTime prod(mtmap.design.sz)], 1, 1:size(mtmap.design.XX,2)-1);
+    sflip = sign(sum(wt));
+    sta.RF = reshape(sflip*wx, mtmap.design.sz);
+    sta.RFtime = sflip*wt;
+    set(gcf, 'currentaxes', ax((kUnit-1)*2 + 1))
+    imagesc(mtmap.design.xax, mtmap.design.yax, sta.RF)
+    colormap(gray.^2)
+    axis xy
+%     axis off
+    set(gcf, 'currentaxes', ax((kUnit-1)*2 + 2))
+    plot(sta.RFtime)
+    axis tight
+    axis off
     drawnow
     
+    
+    
 end
-axis on
-set(gca, 'YTick', '', 'XTick', [-.2 -.1 0], 'XTickLabel', [-.2 -.1 0], 'box', 'off')
-set(gcf, 'renderer', 'painters')
-% set(ax(k), 'XTick', -1:.1:.5, 'XTickLabel', -1:.1:.5, 'TickDir', 'out')
-set(gcf, 'PaperSize', [1 5], 'PaperPosition', [0 0 1 5])
-saveas(gcf, 'hartley_RFs', 'pdf')
-
-%%
 %% gaussian pyramid noise
 
 stim = 'gaussianNoiseBlobs';

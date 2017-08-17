@@ -25,7 +25,7 @@ ip.addOptional('clusterIds', [])
 ip.parse(varargin{:})
 
 if isempty(ip.Results.figure)
-    fig = figure();
+    fig = gca;
 else
     fig = figure(ip.Results.figure);
 end
@@ -68,11 +68,15 @@ for i = ss(1:ceil((n/ip.Results.numWaveforms)):n)'
     data = double(fread(fid, buffer, '*int16'));
     data = data(chanMap,:)';
     data = bsxfun(@minus, data, mean(data([1:10 (buffer(2)-10):buffer(2)],:)));
-    
-    wf = bsxfun(@plus, data*ops.bitVolts, 5*flipud(sp.yc)');
+    if isfield(sp, 'yc')
+        wf = bsxfun(@plus, data*ops.bitVolts, 5*flipud(sp.yc)');
+    else
+        wf = data*ops.bitVolts;
+    end
     plot((1:buffer(2))+kClust*buffer(2), wf, 'Color', cmap(kClust,:)); hold on
 end
 drawnow
 end
+axis tight
 
 fclose(fid);

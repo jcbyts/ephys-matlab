@@ -83,17 +83,19 @@ bufferSize = [Nchan nTotSamp];
 
 dataRAW = fread(fid, bufferSize, '*int16');
 
+
+
 fprintf('[%02.2fs]\n', toc)
 
-dataRAW = dataRAW';
+dataRAW = double(dataRAW');
+
 % --- correct phase from Open Ephys headstage (e.g., Okun 2016)
-% fprintf('Correcting phase from OE headstage @ %dHz...\t', OE_HIGHPASS)
-% dataRAW = double(dataRAW');
-% 
-% for ch = 1:Nchan
-%     dataRAW(:,ch) = preprocess.correctOeLfpPhase(dataRAW(:,ch), info.sampleRate, OE_HIGHPASS);
-% end
-% fprintf('[%02.2fs]\n', toc)
+fprintf('Correcting phase from OE headstage @ %dHz...\t', OE_HIGHPASS)
+
+for ch = 1:Nchan
+    dataRAW(:,ch) = preprocess.correctOeLfpPhase(dataRAW(:,ch), info.sampleRate, OE_HIGHPASS);
+end
+fprintf('[%02.2fs]\n', toc)
 
 % --- low pass filter
 fprintf('Lowpass filter at %dHz...\t', LOW_CUTOFF)
@@ -142,7 +144,7 @@ for ch = 1:Nchan
         figure(f(1)); clf
     end
       
-    newdata = preprocess.removeLineNoiseChunkwise(data(iigood,ch), NEW_FS, LINE_NOISE_FREQ, 2, 30, plotIt);
+    newdata = preprocess.removeLineNoiseChunkwise(data(iigood,ch), NEW_FS, LINE_NOISE_FREQ, 2, 120, plotIt);
     
     
     if plotIt
