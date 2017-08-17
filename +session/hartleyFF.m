@@ -304,7 +304,7 @@ classdef hartleyFF < handle
                     
                     uIx = s.cids==clustId(kUnit);
                     
-                    if s.uQ(uIx)>20 && s.cR(uIx) < .2
+                    if isfield(s, 'uQ') && s.uQ(uIx)>20 && s.cR(uIx) < .2
                         plot(bcenters(j), i-numel(sequenceStarts)*(kUnit-1), '.', 'Color', cmap(kUnit,:)); hold on
                     else
                         plot(bcenters(j), i-numel(sequenceStarts)*(kUnit-1), '.', 'Color', repmat(.5, 1, 3)); hold on

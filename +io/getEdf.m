@@ -63,6 +63,7 @@ nPds = numel(PDS);
 
 for kPds = 1:nPds
     
+    try
     [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds});
     fwrite(fidout, dataRAW', '*uint16')
     
@@ -71,6 +72,10 @@ for kPds = 1:nPds
     elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
     elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
     elInfo.bitDeg       = el_info.bitDeg;
+    catch
+        warning(sprintf('no edf data for PDS %d', kPds))
+    end
+    
 end
 
 elInfo.sampleRate = unique(elInfo.sampleRate);

@@ -16,7 +16,8 @@ end
 behaviorDir = fullfile(sessionInfo.path, '_behavior');
 try
     if exist(behaviorDir, 'dir') && ~overwrite
-        load(fullfile(behaviorDir, 'PDS.mat'));
+        tmp = load(fullfile(behaviorDir, 'PDS.mat'));
+        PDS = tmp.PDS;
         return
     end
 end

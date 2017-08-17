@@ -8,13 +8,14 @@ addEphysMatlab
 
 %% set session directory
 oepath = 'C:\Data\Ellie_2017-07-31_15-21-11_Shnkd8';
-oepath = 'C:\Data\Ellie_2017-08-09_13-04-23_ShankD15MT6';
+% oepath = 'C:\Data\Ellie_2017-08-09_13-04-23_ShankD15MT6';
+oepath = 'C:\Data\Ellie_2017-08-08_13-41-34_Shank2D14MT5';
 % oepath = uigetdir(); % select using GUI
 
 %% Load relevant data into the workspace
 [sess, ops, info] = io.loadSession(oepath);
 
-PDS = io.getPds(sess);
+PDS = io.getPds(sess,1);
 
 sp = io.getSpikes(sess);
 
@@ -72,19 +73,25 @@ ylabel('amplitude (deg)')
 %% Flash / Saccade triggered CSD
 
 % pick a shank and load LFP
-iShank = 1;
+iShank = 2;
 [lfp, lfpTime, lfpInfo] = io.getLFP(ops(iShank));
 
 % --- flash-triggered
 csdTrial = io.csdTrial(PDS);
-eventTimes = [csdTrial.onset];
+if isfield(csdTrial, 'onset')
+    flashTimes = [csdTrial.onset];
+else
+    flashTimes = 1;
+end
 
-figure(1); clf
-subplot(1,2,1)
-plot.CsdBasic(lfp, eventTimes, lfpInfo)
-title('Flash Triggered')
-xlabel('ms')
-ylabel('depth')
+if ops(iShank).Nchan > 10
+    figure(1); clf
+    subplot(1,2,1)
+    plot.CsdBasic(lfp, flashTimes, lfpInfo)
+    title('Flash Triggered')
+    xlabel('ms')
+    ylabel('depth')
+end
 
 % --- saccade-triggered
 eventTimes = saccades(1,:);
@@ -92,90 +99,101 @@ eventTimes = saccades(1,:);
 % (uncontaminated)
 ixLong = find([0 diff(eventTimes)>.2]);
 
-subplot(1,2,2)
-plot.CsdBasic(lfp, eventTimes(ixLong), lfpInfo)
-title('Saccade Triggered')
-xlabel('ms')
-ylabel('depth')
+if ops(iShank).Nchan > 10
+    subplot(1,2,2)
+    plot.CsdBasic(lfp, eventTimes(ixLong), lfpInfo)
+    title('Saccade Triggered')
+    xlabel('ms')
+    ylabel('depth')
+end
 
 % Look for saccade-direction tuning in the LFP
 th = cart2pol(saccades(7,:) - saccades(5,:), saccades(8,:) - saccades(6,:))'/pi*180;
 
-figure(2); clf
+if ops(iShank).Nchan > 10
+    figure(2); clf
+end
+
 et = eventTimes(ixLong)';
 ev = io.convertTimeToSamples(et, lfpInfo.sampleRate, lfpInfo.timestamps(:), lfpInfo.fragments(:));
 th = th(ixLong(:));
-thBins = 0:30:360;
+thBins = 0:45:360;
 ch0 = (1:32)*40;
 cmap = flipud(hsv(numel(thBins)));
-subplot(1,2,2)
-for i = 1:numel(thBins)-1
+if ops(iShank).Nchan > 10
+    subplot(1,2,2)
+    for i = 1:numel(thBins)-1
+        
+        ii = th > thBins(i) & th < thBins(i+1);
+        [sta,~,bc] = pdsa.eventTriggeredAverage(lfp, ev(ii), [-300 400]);
+        
+        plot(bc, bsxfun(@plus, sta, ch0), 'Color', cmap(i,:)); hold on
+        %     plot(bc, sta+sd, '--', 'Color', cmap(i,:));
+        %     plot(bc, sta-sd, '--', 'Color', cmap(i,:));
+        
+    end
     
-    ii = th > thBins(i) & th < thBins(i+1);
-    [sta,~,bc] = pdsa.eventTriggeredAverage(lfp, ev(ii), [-300 400]);
+    xlabel('Time from saccade')
     
-    plot(bc, bsxfun(@plus, sta, ch0), 'Color', cmap(i,:)); hold on
-%     plot(bc, sta+sd, '--', 'Color', cmap(i,:));
-%     plot(bc, sta-sd, '--', 'Color', cmap(i,:));
+    axis tight
+    xlim([-100 200])
+    yd = ylim;
+    ax2 = axes('Position', get(gca, 'Position'));
+    for i = 1:numel(thBins)-1
+        quiver(ax2, 0, 0, cosd(mean(thBins(i + [0 1]))), sind(mean(thBins(i + [0 1]))), 'Color', cmap(i,:), 'AutoScale', 'off'); hold on
+        axis off
+        
+    end
+    xlim([-1 10])
+    ylim([-10 1])
+    title('Saccade-triggered LFP')
+    
+    subplot(1,2,1)
+    % flash triggered LFP overlayed
+    flashTimes = [csdTrial.onset]';
+    flashSamples = io.convertTimeToSamples(flashTimes, lfpInfo.sampleRate, lfpInfo.timestamps(:), lfpInfo.fragments(:));
+    [sta,~,bc] = pdsa.eventTriggeredAverage(lfp, flashSamples, [-300 400]);
+    plot(bc, bsxfun(@plus, sta, ch0), 'Color', 'k');
+    axis tight
+    ylim(yd)
+    xlim([-100 200])
+    xlabel('Time from flash')
+    title('Flash-triggered LFP')
     
 end
-
-xlabel('Time from saccade')
-
-axis tight
-xlim([-100 200])
-yd = ylim;
-ax2 = axes('Position', get(gca, 'Position'));
-for i = 1:numel(thBins)-1
-quiver(ax2, 0, 0, cosd(mean(thBins(i + [0 1]))), sind(mean(thBins(i + [0 1]))), 'Color', cmap(i,:), 'AutoScale', 'off'); hold on
-axis off
-
-end
-xlim([-1 10])
-ylim([-10 1])
-title('Saccade-triggered LFP')
-
-subplot(1,2,1)
-% flash triggered LFP overlayed
-flashTimes = [csdTrial.onset]';
-flashSamples = io.convertTimeToSamples(flashTimes, lfpInfo.sampleRate, lfpInfo.timestamps(:), lfpInfo.fragments(:));
-[sta,~,bc] = pdsa.eventTriggeredAverage(lfp, flashSamples, [-300 400]);
-plot(bc, bsxfun(@plus, sta, ch0), 'Color', 'k');
-axis tight
-ylim(yd)
-xlim([-100 200])
-xlabel('Time from flash')
-title('Flash-triggered LFP')
-
 
 figure(3); clf
 s = sp{iShank};
-goodUnits = s.uQ > 15;
-udepths = s.clusterDepths(goodUnits);
-uId = s.cids(goodUnits);
-[~, depthId] = sort(udepths);
-clustId = uId(depthId);
+if isfield(s, 'uQ')
+    goodUnits = s.uQ > 15;
+    udepths = s.clusterDepths(goodUnits);
+    uId = s.cids(goodUnits);
+    [~, depthId] = sort(udepths);
+    clustId = uId(depthId);
+else
+    clustId = s.cids;
+end
 nUnits = numel(clustId); % including
 
 ax = pdsa.tight_subplot(nUnits, 1, 0.01,  0.01);
 for kUnit = 1:nUnits
-   st = s.st(s.clu == clustId(kUnit));
-   
-   set(gcf, 'currentaxes', ax(kUnit))
-   for i = 1:numel(thBins)-1
-       
-       ii = th > thBins(i) & th < thBins(i+1);
-       [sta, sd, bc] = pdsa.eventPsth(st, et(ii), [-.3 .3], .01);
-       
-       plot(bc, sta, 'Color', cmap(i,:)); hold on
-       plot(bc, sta+sd, '--', 'Color', cmap(i,:));
-       plot(bc, sta-sd, '--', 'Color', cmap(i,:));
-       
-   end
-   plot([0 0], ylim, 'k')
-   axis tight
-   axis off
-
+    st = s.st(s.clu == clustId(kUnit));
+    
+    set(gcf, 'currentaxes', ax(kUnit))
+    for i = 1:numel(thBins)-1
+        
+        ii = th > thBins(i) & th < thBins(i+1);
+        [sta, sd, bc] = pdsa.eventPsth(st, et(ii), [-.3 .3], .01);
+        
+        plot(bc, sta, 'Color', cmap(i,:)); hold on
+        plot(bc, sta+sd, '--', 'Color', cmap(i,:));
+        plot(bc, sta-sd, '--', 'Color', cmap(i,:));
+        
+    end
+    plot([0 0], ylim, 'k')
+    axis tight
+    axis off
+    
 end
 
 
@@ -190,7 +208,11 @@ hart.buildDesignMatrix();
 %% 
 iShank = 1;
 s = sp{iShank};
-clustIds = s.cids(s.uQ>1);
+if isfield(s, 'uQ')
+    clustIds = s.cids(s.uQ>1);
+else
+    clustIds = s.cids;
+end
 nUnits = numel(clustIds);
 
 figure(1); clf
@@ -231,21 +253,78 @@ hart.plotFrozenRaster(s);
 
 %% dot revco mapping
 
-mtmap = session.mtDotRcMap(PDS);
+mtmap = session.mtDotRcMap(PDS, true);
 
-mtmap.buildDesignMatrix('xwin', [-5 5], 'ywin', [-5 5], 'binSize', 1);
+mtmap.buildDesignMatrix('xwin', [-8 8], 'ywin', [-8 8], 'binSize', 1);
 
+%%
+% figure(3); clf
+% ax = pdsa.tight_subplot(nUnits, 2, .01, .01);
+
+iShank = 1;
+s = sp{iShank};
+Xsmooth = filter(ones(5,1)/5, 1, mtmap.design.X); % filter forward
+C= (Xsmooth'*Xsmooth);
+C = C + 10e6*eye(size(Xsmooth,2));
+% plot.spikeWaveformsFromOps(ops(2), s)
+for kUnit = 1:nUnits
+    spikeTimes = s.st; %(s.clu==clustIds(kUnit));
+    
+    y = histc(spikeTimes, mtmap.design.rowTimes);
+    
+    y(diff(mtmap.design.rowTimes) > 1.5*mtmap.display.ifi) = 0;
+    y(y>15) = 0;
+    figure(1); clf
+    subplot(2,2,1:2)
+    plot(smooth(y,10))
+    
+    
+    
+    subplot(2,2,3)
+    sta = C\Xsmooth'*(y-mean(y));
+    imagesc(mtmap.design.xax, mtmap.design.yax, reshape(sta, mtmap.design.sz(1), mtmap.design.sz(2)*2))
+    
+    pause
+%     yy = y'*y';
+%     ny = numel(y);
+%     
+%     [w_hat, wt, wx, wlin] = bilinearMixRegress_coordAscent(mtmap.design.XX + 10e2*speye(size(mtmap.design.XX,2)), xy, [mtmap.design.nkTime prod(mtmap.design.sz)], 1, 1:size(mtmap.design.XX,2)-1);
+%     sflip = sign(sum(wt));
+%     sta.RF = reshape(sflip*wx, mtmap.design.sz);
+%     sta.RFtime = sflip*wt;
+%     set(gcf, 'currentaxes', ax((kUnit-1)*2 + 1))
+%     imagesc(mtmap.design.xax, mtmap.design.yax, sta.RF)
+%     colormap(gray.^2)
+%     colormap jet
+%     axis xy
+% %     axis off
+%     set(gcf, 'currentaxes', ax((kUnit-1)*2 + 2))
+%     plot(sta.RFtime)
+%     axis tight
+%     axis off
+%     drawnow
+%     
+    
+    
+end
 
 %% try bilinear RF estimation
 figure(3); clf
 ax = pdsa.tight_subplot(nUnits, 2, .01, .01);
+
+plot.spikeWaveformsFromOps(ops(2), s)
 for kUnit = 1:nUnits
-    spikeTimes = s.st(s.clu==clustIds(kUnit));
+    spikeTimes = s.st; %(s.clu==clustIds(kUnit));
     
     y = histc(spikeTimes, mtmap.design.rowTimes);
     
     y(diff(mtmap.design.rowTimes) > 1.5*mtmap.display.ifi) = 0;
     
+    figure(4)
+    plot(smooth(y,10))
+    pause
+    
+    figure(3)
     xy = mtmap.design.Xd'*y;
 %     yy = y'*y';
     ny = numel(y);
@@ -257,6 +336,7 @@ for kUnit = 1:nUnits
     set(gcf, 'currentaxes', ax((kUnit-1)*2 + 1))
     imagesc(mtmap.design.xax, mtmap.design.yax, sta.RF)
     colormap(gray.^2)
+    colormap jet
     axis xy
 %     axis off
     set(gcf, 'currentaxes', ax((kUnit-1)*2 + 2))
@@ -401,7 +481,7 @@ sz = ceil([diff(ywin)/binSize diff(xwin)/binSize]);
 
 binfun = @(x) (x==0) + ceil(x/binSize);
 
-X = [];
+Xsmooth = [];
 
 gkern = {};
 levels = 1;
@@ -436,7 +516,7 @@ ix = ~isnan(gridpos);
 
 [frameNumber,gaussianNumber] = find(ix);
 
-X = [X sparse(frameNumber, gridpos(ix), c(ix), numel(flipTimes), prod(sz))];
+Xsmooth = [Xsmooth sparse(frameNumber, gridpos(ix), c(ix), numel(flipTimes), prod(sz))];
 
 end
 
@@ -446,7 +526,7 @@ addpath l1_ls_matlab\
 %% sanity check
 figure(1); clf
 kFrame = randi(numel(flipTimes));
-tmp = sum(reshape(X(kFrame,:), [], numel(levels)),2);
+tmp = sum(reshape(Xsmooth(kFrame,:), [], numel(levels)),2);
 imagesc(xax*ppd, yax*ppd, reshape(tmp, sz)); hold on
 
 
@@ -455,9 +535,9 @@ plot(xposRel(kFrame,levelIx), yposRel(kFrame,levelIx), 'or')
 %% measure STA
 addBias = 0;
 if addBias
-    Xd = [X ones(size(X,1), 1)]; %X.^2;
+    Xd = [Xsmooth ones(size(Xsmooth,1), 1)]; %X.^2;
 else
-    Xd = X;
+    Xd = Xsmooth;
 end
 % C = Xd'*Xd;
 

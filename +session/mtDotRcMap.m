@@ -10,7 +10,12 @@ classdef mtDotRcMap < handle
     end
     
     methods
-        function m = mtDotRcMap(PDS)
+        function m = mtDotRcMap(PDS, fixationOnly)
+            
+            if nargin < 2
+                fixationOnly = false;
+            end
+            
             stim = 'DotMapping';
             
             ppd  = PDS{1}.initialParametersMerged.display.ppd;
@@ -21,9 +26,11 @@ classdef mtDotRcMap < handle
             
             m.display = PDS{find(hasStim,1)}.initialParametersMerged.display;
             
-%             hasFixation = cellfun(@(x) strncmp(x.initialParametersMerged.pldaps.trialFunction, 'stimuli.fixflash', 16), PDS);
+            hasFixaton = cellfun(@(x) strncmp(x.initialParametersMerged.pldaps.trialFunction, 'stimuli.fixflash', 16), PDS);
             
-            hasStim = hasStim(:); % & ~hasFixation(:);
+            if fixationOnly
+                hasStim = hasStim(:) & hasFixaton(:);
+            end
             
             mtmapTrial = struct();
             trialNum = 0;
@@ -40,7 +47,7 @@ classdef mtDotRcMap < handle
                 
                 for j = 1:numel(stimTrials)
                     thisTrial = stimTrials(j);
-%                     try
+                    try
                         kTrial = trialNum + j;
                         
                         % --- Timing
@@ -72,6 +79,7 @@ classdef mtDotRcMap < handle
                         tdiff = abs(bsxfun(@minus, mtmapTrial(kTrial).eyeSampleTime, t(:)')) < mean(diff(mtmapTrial(kTrial).eyeSampleTime));
                         [irow,~] = find(diff(tdiff)==-1);
                         
+                    
                         mtmapTrial(kTrial).saccades = false(size(mtmapTrial(kTrial).frameTimes));
                         mtmapTrial(kTrial).saccadeTimes = results(1,:)+mtmapTrial(kTrial).start;
                         
@@ -85,9 +93,21 @@ classdef mtDotRcMap < handle
                         mtmapTrial(kTrial).saccadeDirection = th/pi*180;
                         mtmapTrial(kTrial).saccadeAmp       = rho;
                         
-                        for iSaccade = 1:size(results,2)
-                            ix = t > (results(1, iSaccade)-0.05) & t < (results(2,iSaccade)+0.05);
-                            mtmapTrial(kTrial).saccades(ix) = true;
+                        if fixationOnly
+                            fixations = diff(results(1,:))>.35;
+                            if any(fixations)
+                                for iSaccade = find(fixations(:)')
+                                    ix = t > results(2,iSaccade) + .05 && t < results(1,iSaccade+1);
+                                    
+                                    mtmapTrial(kTrial).saccades(ix) = true;
+                                end
+                            end
+                        else
+                            
+                            for iSaccade = 1:size(results,2)
+                                ix = t > (results(1, iSaccade)-0.05) & t < (results(2,iSaccade)+0.05);
+                                mtmapTrial(kTrial).saccades(ix) = true;
+                            end
                         end
                         
                         mtmapTrial(kTrial).eyePosAtFrame = [mtmapTrial(kTrial).eyeXPx(irow) mtmapTrial(kTrial).eyeYPx(irow)];
@@ -111,13 +131,14 @@ classdef mtDotRcMap < handle
                         mtmapTrial(kTrial).yposEye    = -bsxfun(@minus, mtmapTrial(kTrial).ypos, mtmapTrial(kTrial).eyePosAtFrame(:,2));
                         
                         mtmapTrial(kTrial).apertureSize = [PDS{i}.data{thisTrial}.(stim).hDots.maxRadius]/ppd;
-%                     end
+                    end
                     
                 end
                 
                 trialNum = kTrial;
             end
             
+            mtmapTrial(arrayfun(@(x) isempty(x.xpos),mtmapTrial)) = [];
             m.trial = mtmapTrial;
             m.numTrials = numel(mtmapTrial);
             
@@ -158,7 +179,11 @@ classdef mtDotRcMap < handle
             ip.addParameter('xwin', [0 8])
             ip.addParameter('ywin', [-8 2])
             ip.addParameter('binSize', 1)
+            ip.addParameter('fullSpatioTemporal', false)
+            
             ip.parse(varargin{:})
+            
+            fullSpatioTemporal = ip.Results.fullSpatioTemporal;
             
             xwin  = ip.Results.xwin;
             ywin  = ip.Results.ywin;
@@ -188,33 +213,39 @@ classdef mtDotRcMap < handle
                 fprintf('%d / %d \n', kTrial, nTrials)
                 frameIdx = iFrame + (1:numel(m.trial(kTrial).frameTimes));
                 
+                ixGood = ~m.trial(kTrial).saccades;
                 
-                x = m.trial(kTrial).xposEye/ppd;
-                y = m.trial(kTrial).yposEye/ppd;
-                
-                nGrid  = prod(sz);
-                nFrame = size(x,1);
-                nApert = size(x,2);
-                s = unique(m.trial(kTrial).apertureSize);
-                
-                for iDot = 1:nApert
-                    xd = x(:, iDot) - xgrid(:)';
-                    yd = y(:, iDot) - ygrid(:)';
-                    r = sqrt(xd.^2 + yd.^2);
-                    r(isnan(r)) = inf;
-                    idx = r <= s;
-                    [i, j] = find(idx);
-                    %         ind = find(idx);
+                if any(ixGood)
                     
-                    ind = sub2ind([nFrame nGrid], i, j);
-                    dxtmp = zeros(nFrame, nGrid);
-                    dytmp = zeros(nFrame, nGrid);
-                    dxtmp(ind) = m.trial(kTrial).dx(i,iDot);
-                    dytmp(ind) = m.trial(kTrial).dy(i,iDot);
+                    frameIdx = frameIdx(ixGood);
                     
-                    dx(frameIdx,:) = dx(frameIdx,:) + dxtmp;
-                    dy(frameIdx,:) = dy(frameIdx,:) + dytmp;
+                    x = m.trial(kTrial).xposEye(ixGood,:)/ppd;
+                    y = m.trial(kTrial).yposEye(ixGood,:)/ppd;
                     
+                    nGrid  = prod(sz);
+                    nFrame = size(x,1);
+                    nApert = size(x,2);
+                    s = unique(m.trial(kTrial).apertureSize);
+                    
+                    for iDot = 1:nApert
+                        xd = x(:, iDot) - xgrid(:)';
+                        yd = y(:, iDot) - ygrid(:)';
+                        r = sqrt(xd.^2 + yd.^2);
+                        r(isnan(r)) = inf;
+                        idx = r <= s | r <= binSize;
+                        [i, j] = find(idx);
+                        %         ind = find(idx);
+                        
+                        ind = sub2ind([nFrame nGrid], i, j);
+                        dxtmp = zeros(nFrame, nGrid);
+                        dytmp = zeros(nFrame, nGrid);
+                        dxtmp(ind) = m.trial(kTrial).dx(i,iDot);
+                        dytmp(ind) = m.trial(kTrial).dy(i,iDot);
+                        
+                        dx(frameIdx,:) = dx(frameIdx,:) + dxtmp;
+                        dy(frameIdx,:) = dy(frameIdx,:) + dytmp;
+                        
+                    end
                 end
                 
 %                 spcnt(frameIdx) = histc(sp.st, m.trial(kTrial).frameTimes);
@@ -223,20 +254,26 @@ classdef mtDotRcMap < handle
                 
             end
             
-            %% do some regreesion
+            %% set up for regression
             ifi = m.display.ifi;
             nkt = ceil(.15/ifi);
-            X = double(dx > 0 |  dy > 0);
-            Xd = rfmap.makeStimRowsDense(X , nkt);
+            m.design.X = [dx dy];
             
-            m.design.biasCol = size(Xd,2)+1;
-            m.design.Xd = [Xd ones(nTotalFrames,1)];
-            
-            m.design.nkt = nkt;
             flipTimes = [m.trial.frameTimes];
             m.design.rowTimes = flipTimes(:);
-            m.design.XX = m.design.Xd'*m.design.Xd;
-            m.design.nkTime = nkt;
+            
+            if fullSpatioTemporal
+                X = double(dx > 0 |  dy > 0);
+                Xd = rfmap.makeStimRowsDense(X , nkt);
+                
+                m.design.biasCol = size(Xd,2)+1;
+                m.design.Xd = [Xd ones(nTotalFrames,1)];
+                
+                m.design.nkt = nkt;
+                
+                m.design.XX = m.design.Xd'*m.design.Xd;
+                m.design.nkTime = nkt;
+            end
             m.design.xax = xax;
             m.design.yax = yax;
             m.design.sz = [numel(xax) numel(yax)];

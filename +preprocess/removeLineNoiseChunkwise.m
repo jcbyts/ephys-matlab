@@ -31,6 +31,11 @@ function [newdata] = removeLineNoiseChunkwise(data,sr,freqs,freqrange,chunksize,
     end
  
     chunksize = chunksize*sr;
+    
+    n = numel(data);
+    if chunksize > n
+        chunksize = n;
+    end
  
     %zero pad
     origlen = length(data);

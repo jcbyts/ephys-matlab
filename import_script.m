@@ -24,7 +24,7 @@ addEphysMatlab
 %       into headstage 1, and a single electode is plugged into headstage 2
 
 % --- choose the session directory you want to analyze
-oepath = uigetdir();
+% oepath = uigetdir();
 
 % --- setup the hardware you used
 clear shank
@@ -41,9 +41,9 @@ shank{1}.name = 'V1';
 % headstage 2)
 
 % % list single electrode channels (this can be a vector if > 1 electrode used)
-chanMap = 4;
-shank{2} = hardware.electrode.customChannelMap(chanMap);
-shank{2}.name = 'MtBurrHoleMapping';
+% chanMap = 4;
+% shank{2} = hardware.electrode.customChannelMap(chanMap);
+% shank{2}.name = 'MtBurrHoleMapping';
 % If you chose hardware.electrode.customChannelMap(chNum), the channel map
 % will be chanMap. That's it. No specifying headstage necessary.
 
@@ -116,8 +116,10 @@ end
 % This is really slow because of the line-noise fitting and correction
 ops = io.loadOps(oepath);
 
+overwrite = false;
+plotIt = false;
 for i = 1:numel(ops)
-    io.getLFP(ops(i));
+    io.getLFP(ops(i),overwrite,plotIt);
 end
 
 %% Step 5: Import PLDAPS / eyelink files
@@ -125,7 +127,7 @@ end
 % --- load session: This is central to all operations
 [sess, ops, info] = io.loadSession(oepath);
 
-overwrite = false; % if it breaks, run again with true 
+overwrite = true; % if it breaks, run again with true 
 PDS = io.getPds(sess, overwrite);
 
 
