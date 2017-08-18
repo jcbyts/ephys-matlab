@@ -1,3 +1,4 @@
+function import_function(oepath, shank)
 %% IMPORT SCRIPT
 % This script shows you how to import an ephys session collected with
 % PLDAPS / Open-Ephys / Eyelink
@@ -13,8 +14,8 @@
 % 3) Eyelink files (*.edf) - These are proprietrary filetpe from SR
 %           research for storying eyelink data.
 
-cd C:\Users\Jake\Repos\ephys-matlab\
-addEphysMatlab
+% cd C:\Users\Jake\Repos\ephys-matlab\
+% addEphysMatlab
 %% Step 0: setup for import
 
 % Make sure you have already copied the data from the server to the local 
@@ -24,28 +25,28 @@ addEphysMatlab
 %       into headstage 1, and a single electode is plugged into headstage 2
 
 % --- choose the session directory you want to analyze
- oepath = uigetdir();
-
-% --- setup the hardware you used
-clear shank
-
-% setup shank2 (plugged into first headstage)
-shank{1} = hardware.electrode.Shank2;
-% specify what type of headstage was used
-shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
-shank{1}.name = 'V1';
-
-% For the single electrodes specify a custom channel map using numbers
-% relative to the headstage start. eg., if using ch36 plugged into
-% headstage 2, this should be channel 4 (relative to the start of
-% headstage 2)
-
-% % list single electrode channels (this can be a vector if > 1 electrode used)
-% chanMap = 4;
-% shank{2} = hardware.electrode.customChannelMap(chanMap);
-% shank{2}.name = 'MtBurrHoleMapping';
-% If you chose hardware.electrode.customChannelMap(chNum), the channel map
-% will be chanMap. That's it. No specifying headstage necessary.
+% % oepath = uigetdir();
+% 
+% % --- setup the hardware you used
+% clear shank
+% 
+% % setup shank2 (plugged into first headstage)
+% shank{1} = hardware.electrode.Shank2;
+% % specify what type of headstage was used
+% shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
+% shank{1}.name = 'V1';
+% 
+% % For the single electrodes specify a custom channel map using numbers
+% % relative to the headstage start. eg., if using ch36 plugged into
+% % headstage 2, this should be channel 4 (relative to the start of
+% % headstage 2)
+% 
+% % % list single electrode channels (this can be a vector if > 1 electrode used)
+% % chanMap = 4;
+% % shank{2} = hardware.electrode.customChannelMap(chanMap);
+% % shank{2}.name = 'MtBurrHoleMapping';
+% % If you chose hardware.electrode.customChannelMap(chNum), the channel map
+% % will be chanMap. That's it. No specifying headstage necessary.
 
 
 %% Step 1: convert the raw ephys data

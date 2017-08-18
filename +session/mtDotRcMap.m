@@ -138,7 +138,9 @@ classdef mtDotRcMap < handle
                 trialNum = kTrial;
             end
             
-            mtmapTrial(arrayfun(@(x) isempty(x.xpos),mtmapTrial)) = [];
+            try
+                mtmapTrial(arrayfun(@(x) isempty(x.xpos),mtmapTrial)) = [];
+            end
             m.trial = mtmapTrial;
             m.numTrials = numel(mtmapTrial);
             

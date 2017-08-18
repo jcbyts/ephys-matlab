@@ -7,15 +7,15 @@ cd C:\Users\Jake\Repos\ephys-matlab\
 addEphysMatlab
 
 %% set session directory
-oepath = 'C:\Data\Ellie_2017-07-31_15-21-11_Shnkd8';
+%oepath = 'C:\Data\Ellie_2017-07-31_15-21-11_Shnkd8';
 % oepath = 'C:\Data\Ellie_2017-08-09_13-04-23_ShankD15MT6';
-oepath = 'C:\Data\Ellie_2017-08-08_13-41-34_Shank2D14MT5';
-% oepath = uigetdir(); % select using GUI
+%oepath = 'C:\Data\Ellie_2017-08-08_13-41-34_Shank2D14MT5';
+ oepath = uigetdir(); % select using GUI
 
 %% Load relevant data into the workspace
 [sess, ops, info] = io.loadSession(oepath);
 
-PDS = io.getPds(sess,1);
+PDS = io.getPds(sess);
 
 sp = io.getSpikes(sess);
 
@@ -73,7 +73,7 @@ ylabel('amplitude (deg)')
 %% Flash / Saccade triggered CSD
 
 % pick a shank and load LFP
-iShank = 2;
+iShank = 1;
 [lfp, lfpTime, lfpInfo] = io.getLFP(ops(iShank));
 
 % --- flash-triggered
@@ -252,11 +252,12 @@ figure(11); clf
 hart.plotFrozenRaster(s);
 
 %% dot revco mapping
-
-mtmap = session.mtDotRcMap(PDS, true);
-
-mtmap.buildDesignMatrix('xwin', [-8 8], 'ywin', [-8 8], 'binSize', 1);
-
+try
+    mtmap = session.mtDotRcMap(PDS, true);
+    mtmap.buildDesignMatrix('xwin', [-8 8], 'ywin', [-8 8], 'binSize', 1);
+catch
+    error('No MT dot mapping trials')
+end
 %%
 % figure(3); clf
 % ax = pdsa.tight_subplot(nUnits, 2, .01, .01);
