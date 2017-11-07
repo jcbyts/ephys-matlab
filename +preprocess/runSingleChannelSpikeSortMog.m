@@ -4,25 +4,24 @@ info = load(fullfile(ops.root, 'ephys_info.mat'));
 data = io.loadRaw(ops, [], true); % load data in mV
 
 % highpass filter
-[b,a] = butter(3, 300/30e3*2, 'high');
+%[b,a] = butter(3, 300/30e3*2, 'high');
+
+[b,a] = butter(3, [(300/30e3*2), (6000/30e3*2)]);
+
+size(data)
+
+% detect artifacts
+%[data, bad] = preprocess.removeChannelArtifacts(data, 1000, 1, 30, false);
+%data(bad,:) = 0;
 
 data = data';
 data = filter(b,a,data);
 data = flipud(data);
 data = filter(b,a,data);
 data = flipud(data);
-
-% detect artifacts
-[data, bad] = preprocess.removeChannelArtifacts(data, 1000, 1, 30, false);
-data(bad,:) = 0;
-
-figure(1); clf
-plot(data)
-ylabel('mV')
-xlabel('samples')
+% SD_data = std(data);
 
 sp = struct('ss', [], 'clu', []);
-
 nChannels = size(data,2);
 Fs = info.sampleRate; % sampling rate
 threshhold = -4; % in SD
