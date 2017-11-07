@@ -5,6 +5,8 @@ function [ops, info] = oe2dat(oepath, shanks, varargin)
 %   shanks@cell   - array of electrodes used
 %
 % Optional Inputs (argument pairs):
+%   overwrite@logical - overwrite imported data (default: false)
+%   verbose@logical   - print to the command window
 ops = [];
 
 if nargin < 2
@@ -19,6 +21,8 @@ end
 
 % --- parse optional arguments
 ip = inputParser();
+ip.addParameter('overwrite', false)
+ip.addParameter('verbose', false)
 ip.parse(varargin{:});
 
 % -------------------------------------------------------------------------
@@ -91,10 +95,12 @@ fops    = fullfile(oepath, shankName, 'ops.mat');          % spike-sorting struc
 finfo   = fullfile(oepath, shankName, 'ephys_info.mat');   % meta data about the binary
 
 % --- Exit if this has already been run
-if exist(fops, 'file')
+if exist(fops, 'file') && ~ip.Results.overwrite
     ops  = load(fops);
     info = load(finfo);
     return
+else
+    disp('replacing old files');
 end
 
 numChannels = numel(chanMap);
@@ -102,6 +108,10 @@ numChannels = numel(chanMap);
 fs = cell(numChannels,1);
 for j = 1:numChannels
     ch = chanMap(j);
+    
+    if ip.Results.verbose
+        fprintf('*CH%d.continuous\n',ch);
+    end
     
     tmp = dir(fullfile(oepath, sprintf('*CH%d.continuous',ch) ));
     % if separate files are saved by open ephys gui
