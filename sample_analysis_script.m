@@ -1,3 +1,4 @@
+
 %% Sample Analysis Script
 % This script shows an example of how to load data into the workspace
 % (assuming it has been properly imported)
@@ -32,6 +33,52 @@ for iShank = 1:nShanks
     fig(iShank) = plot.spikeWaveformsFromOps(ops(iShank), sp{iShank}, 'figure', iShank, 'clusterIds', clusterIds, 'numWaveforms', 10);
 end
 
+
+%% Spatial Mapping: square flash
+
+% build trial structure
+spatialMap = session.squareFlash(PDS);
+
+help session.squareFlash/binSpace % tells you how to use the function
+%% bin space at the resolution you are interested
+window = [-16 16]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
+binSize = 4; %.5; % degrees
+
+stim = spatialMap.binSpace('window', window, 'binSize', binSize, 'correctEyePos', true);
+
+nTimeBins = 20; % frames
+Xd = spatialMap.buildDesignMatrix(stim, nTimeBins);
+
+
+%% Plot spatial map for each unit
+iShank = 1;
+s = sp{iShank};
+if isfield(s, 'uQ')
+    clustIds = s.cids(s.uQ>1);
+else
+    clustIds = s.cids;
+end
+nUnits = numel(clustIds);
+
+kUnit = 1;
+spikeTimes = s.st(s.clu==clustIds(kUnit));
+
+sta = spatialMap.spikeTriggeredAverage(stim, Xd, spikeTimes);
+
+figure; clf
+ax = subplot(1,2,1);
+imagesc(stim.xax, stim.yax, sta.RF); axis xy
+colormap gray
+grid on
+ax.GridColor = 'y';
+ax.GridAlpha = .25;
+title('Spatial Map', 'fontweight', 'normal')
+xlabel('degrees')
+ylabel('degrees')
+subplot(1,2,2)
+plot(sta.time, sta.RFtime)
+xlabel('Time (seconds)')
+title(sprintf('Unit: %d', kUnit))
 %% detect saccades
 % This is quick and dirty. We should probably replace this with something
 % more robust. I doubt we want to score every saccade in the GUI, but we
@@ -162,6 +209,8 @@ if ops(iShank).Nchan > 10
     
 end
 
+%% ********** spiking locked to saccades **********
+
 figure(3); clf
 s = sp{iShank};
 if isfield(s, 'uQ')
@@ -175,7 +224,7 @@ else
 end
 nUnits = numel(clustId); % including
 
-ax = pdsa.tight_subplot(nUnits, 1, 0.01,  0.01);
+ax = pdsa.tight_subplot(nUnits, 1, 0.1,  0.1);
 for kUnit = 1:nUnits
     st = s.st(s.clu == clustId(kUnit));
     
@@ -192,7 +241,7 @@ for kUnit = 1:nUnits
     end
     plot([0 0], ylim, 'k')
     axis tight
-    axis off
+    %axis off
     
 end
 
@@ -349,6 +398,9 @@ for kUnit = 1:nUnits
     
     
 end
+
+
+
 %% gaussian pyramid noise
 
 stim = 'gaussianNoiseBlobs';

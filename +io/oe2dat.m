@@ -82,7 +82,11 @@ end
 
 
 
-function [ops, info] = oe2dat_helper(oepath, shankName, chanMap, xcoords, ycoords, zcoords) %#ok<INUSD>
+function [ops, info] = oe2dat_helper(oepath, shankName, chanMap, xcoords, ycoords, zcoords, verbose)
+
+if ~exist('verbose', 'var')
+    verbose = false;
+end
 
 % --- declare constants
 NUM_HEADER_BYTES    = 1024; % size of header for each analog file
@@ -109,7 +113,7 @@ fs = cell(numChannels,1);
 for j = 1:numChannels
     ch = chanMap(j);
     
-    if ip.Results.verbose
+    if verbose
         fprintf('*CH%d.continuous\n',ch);
     end
     

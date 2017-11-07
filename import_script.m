@@ -31,22 +31,25 @@ clear shank
 
 % setup shank2 (plugged into first headstage)
 shank{1} = hardware.electrode.Shank2;
-% specify what type of headstage was used
+% shank{1} = hardware.electrode.AtlasZifOmnDrive_1;
+% % specify what type of headstage was used
 shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
-shank{1}.name = 'V1';
+shank{1}.name = 'MT';
 
 % For the single electrodes specify a custom channel map using numbers
 % relative to the headstage start. eg., if using ch36 plugged into
 % headstage 2, this should be channel 4 (relative to the start of
 % headstage 2)
 
-% % list single electrode channels (this can be a vector if > 1 electrode used)
-% chanMap = 4;
-% shank{2} = hardware.electrode.customChannelMap(chanMap);
-% shank{2}.name = 'MtBurrHoleMapping';
+% list single electrode channels (this can be a vector if > 1 electrode used)
+%  chanMap = 4;
+%  shank{1} = hardware.electrode.customChannelMap(chanMap);
+%  shank{1}.name = 'Christ-Cap Drive MT';
+
+% shank{1} = hardware.electrode.customChannelMap(chanMap);
+% shank{1}.name = 'MtBurrHoleMapping';
 % If you chose hardware.electrode.customChannelMap(chNum), the channel map
 % will be chanMap. That's it. No specifying headstage necessary.
-
 
 %% Step 1: convert the raw ephys data
 % we represent all of our ephys data as a binary file (integers only) and a
@@ -72,7 +75,7 @@ shanksToSortWithKilo = find(cellfun(@(x) numel(x.channelMap)>16, shank));
 % Sorting channels that are not part of a single array will result in
 % errors
 
-for i = 1:numel(shanksToSortWithKilo)
+ for i = 1:numel(shanksToSortWithKilo)
     iShank = shanksToSortWithKilo(i);
     
     % run Kilosort
@@ -97,17 +100,18 @@ for i = 1:numel(shanksToSortWithKilo)
     
     fprintf('importing spikes to matlab\n')
     io.getSpikesFromKilo(ops(iShank));
-end
-
-
-%% Step 3: Spike sort single electrodes (if they exist)
+ end
+ 
+ 
+ 
+ %% Step 3: Spike sort single electrodes (if they exist)
 singleTrodes = find(cellfun(@(x) numel(x.channelMap) < 4, shank));
 if any(singleTrodes)
     clear sp
+    
     for i = 1:numel(singleTrodes)
         iShank = singleTrodes(i);
-
-        sp(i) = preprocess.runSingleChannelSpikeSortMog(ops(iShank));
+        sp{i} = preprocess.runSingleChannelSpikeSortMog(ops(iShank));
     end
 end
 
