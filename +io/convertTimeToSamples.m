@@ -12,7 +12,7 @@ function samples = convertTimeToSamples(times, adfreq, ts, fn)
 % 20140531  jly     wrote it
 
 if nargin < 4
-    fn = round(times(end)*adfreq);
+    fn = round(times(end)/adfreq);
     if nargin < 3
         ts = 0;
         if nargin < 2
@@ -25,10 +25,13 @@ end
 
 nfragments = numel(fn);
 fb = ts;
-fe = (ts+fn*adfreq);
+fe = (ts+fn/adfreq);
+
+se = cumsum(fn);
+sb = [1; se(1:end-1)+1];
 
 samples = nan(size(times));
 for ff = 1:nfragments
     idx = times >= fb(ff) & times <= fe(ff);
-    samples(idx) = floor((times(idx) - fb(ff))*adfreq)+1;
+    samples(idx) = floor((times(idx) - fb(ff))*adfreq)+sb(ff);
 end
