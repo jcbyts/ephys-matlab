@@ -1,9 +1,9 @@
 
-server_directory = 'Z:\Data\PLDAPS\Ellie\';
-local_directory  = 'C:\Data';
+SERVER_DATA_DIR = getpref('EPHYS', 'SERVER_DATA');
+LOCAL_DATA_DIR  = getpref('EPHYS', 'LOCAL_DATA');
 
 
-fldlist = dir(local_directory);
+fldlist = dir(LOCAL_DATA_DIR);
 fldlist(1:2) = []; % remove . and ..
 % only keep directories
 fldlist = fldlist(arrayfun(@(x) x.isdir, fldlist));
@@ -12,16 +12,16 @@ fldlist = fldlist(arrayfun(@(x) x.isdir, fldlist));
 nSessions = numel(fldlist);
 for kDir = 1:nSessions
     
-    all_data = dir(fullfile(local_directory, fldlist(kDir).name));
-    all_data(1:2) = [];
-    derived_data = dir(fullfile(local_directory, fldlist(kDir).name, '_*'));
+    all_data = dir(fullfile(LOCAL_DATA_DIR, fldlist(kDir).name));
+    all_data(1:2) = []; % remove ., ..
+    derived_data = dir(fullfile(LOCAL_DATA_DIR, fldlist(kDir).name, '_*'));
     all_ = arrayfun(@(x) x.name, all_data, 'UniformOutput', false);
     derived_ = arrayfun(@(x) x.name, derived_data, 'UniformOutput', false);
     
     delete_list = setdiff(all_, derived_);
     
     % make sure you don't delete any mat or m files
-    mfiles = dir(fullfile(local_directory, fldlist(kDir).name, '*.m*'));
+    mfiles = dir(fullfile(LOCAL_DATA_DIR, fldlist(kDir).name, '*.m*'));
     m_ = arrayfun(@(x) x.name, mfiles, 'UniformOutput', false);
     delete_list = setdiff(delete_list, m_);
     
@@ -31,11 +31,11 @@ for kDir = 1:nSessions
     end
     
     for i = 1:numel(derived_data)
-        local_  = fullfile(local_directory, fldlist(kDir).name, derived_{i});
-        server_ = fullfile(server_directory, fldlist(kDir).name, derived_{i});
+        local_  = fullfile(LOCAL_DATA_DIR, fldlist(kDir).name, derived_{i});
+        server_ = fullfile(SERVER_DATA_DIR, fldlist(kDir).name, derived_{i});
         
         if ~exist(server_, 'dir')
-            fprintf('[%s] copying to [%s]\n', derived_{i}, fullfile(server_directory, fldlist(kDir).name));
+            fprintf('[%s] copying to [%s]\n', derived_{i}, fullfile(SERVER_DATA_DIR, fldlist(kDir).name));
             copyfile(local_, server_);
             fprintf('Done\n');
         end
@@ -44,14 +44,17 @@ for kDir = 1:nSessions
     
     for j = 1:numel(delete_list)
         
-        local_  = fullfile(local_directory, fldlist(kDir).name, delete_list{j});
-        server_ = fullfile(server_directory, fldlist(kDir).name, delete_list{j});
+        local_  = fullfile(LOCAL_DATA_DIR, fldlist(kDir).name, delete_list{j});
+        server_ = fullfile(SERVER_DATA_DIR, fldlist(kDir).name, delete_list{j});
         
         if exist(server_, 'file')
             fprintf('deleting [%s]\n', local_)
             delete(local_)
         else
-            copyfile(local_, server_)
+            status = copyfile(local_, server_);
+            if status
+                delete(local_)
+            end
         end
         
     end

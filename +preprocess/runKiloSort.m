@@ -6,13 +6,28 @@ ip.addOptional('GPU', true)
 ip.addOptional('parfor', true)
 ip.addOptional('verbose', true)
 ip.addOptional('showfigures', true)
+ip.addOptional('overwrite', false)
 
 ip.parse(varargin{:});
+
+% check if Kilosort has already been run
+if exist(fullfile(ops.root,  'rez.mat'), 'file')
+   fprintf('Kilosort has already been run. Skipping\n')
+   return
+end
 
 fprintf('-----------------------------------------------------------------\n')
 fprintf('-----------------------------------------------------------------\n')
 fprintf('-----------------------------------------------------------------\n')
 fprintf('Running Kilosort\n')
+OLD_DIR = ops.root;
+LOCAL_DIR = fullfile(getpref('EPHYS', 'LOCAL_DATA'), 'kilo-tmp');
+mkdir(LOCAL_DIR)
+% ops_old = ops;
+ops = io.convertOpsToNewDirectory(ops, LOCAL_DIR);
+mkdir(ops.root)
+copyfile(fullfile(OLD_DIR, 'ephys.dat'), ops.fbinary)
+copyfile(fullfile(OLD_DIR, 'chanMap.mat'), ops.chanMap)
 
 if isfield(ops, 'parfor_')
     ops.parfor = ops.parfor_;
@@ -38,13 +53,19 @@ end
 rez                = fitTemplates(rez, DATA, uproj);  % fit templates iteratively
 rez                = fullMPMU(rez, DATA);% extract final spike times (overlapping extraction)
 
+if ops.GPU
+    reset(gpu)
+end
+
+ops = io.convertOpsToNewDirectory(ops, OLD_DIR);
+
 % saving
 fprintf('saving matlab results file\n')
 save(fullfile(ops.root,  'rez.mat'), 'rez', 'ops', '-v7.3');
 
 if merge
     fprintf('Attemptying Automerge\n')
-    rez                = merge_posthoc2(rez);
+    rez                = merge_posthoc3(rez);
 end
 
 fprintf('saving python files for Phy\n')
@@ -53,8 +74,6 @@ fprintf('saving python files for Phy\n')
 rezToPhy(rez, ops.root);
 
 % remove temporary file
-delete(ops.fproc);
+% delete(ops.fproc);
+rmdir(LOCAL_DIR, 's')
 
-if ops.GPU
-    reset(gpu)
-end

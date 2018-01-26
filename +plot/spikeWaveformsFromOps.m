@@ -9,6 +9,7 @@ function fig = spikeWaveformsFromOps(ops, sp, varargin)
 %   'postSpikeBuffer' - numbe of samples after spike to plot
 %   'preSpikeBuffer'  - numbe of samples after spike to plot
 %   'clusterIds'      - list of clusters to plot
+%   'useMean'         - plot mean +- SD instead of all waveforms
 % Output:
 %   fig - figure handle
 % Example call:
@@ -22,6 +23,7 @@ ip.addOptional('numWaveforms', 500)
 ip.addOptional('postSpikeBuffer', 40)
 ip.addOptional('preSpikeBuffer', 10)
 ip.addOptional('clusterIds', [])
+ip.addOptional('useMean', false)
 ip.parse(varargin{:})
 
 if isempty(ip.Results.figure)
@@ -58,24 +60,50 @@ end
 
 for kClust = 1:numel(clustId)
     
-iix = sp.clu==clustId(kClust);
-n = sum(iix);
-ss = sp.ss(iix);
-
-for i = ss(1:ceil((n/ip.Results.numWaveforms)):n)'
-       
-    fseek(fid, (i-10)*2*ops.Nchan, 'bof');
-    data = double(fread(fid, buffer, '*int16'));
-    data = data(chanMap,:)';
-    data = bsxfun(@minus, data, mean(data([1:10 (buffer(2)-10):buffer(2)],:)));
-    if isfield(sp, 'yc')
-        wf = bsxfun(@plus, data*ops.bitVolts, 5*flipud(sp.yc)');
-    else
-        wf = data*ops.bitVolts;
+    iix = sp.clu==clustId(kClust);
+    n = sum(iix);
+    ss = sp.ss(iix);
+    xax = (1:buffer(2))+kClust*buffer(2);
+    
+    numWaveforms = ip.Results.numWaveforms;
+    
+    if ip.Results.useMean
+        wfs = zeros(numWaveforms,numel(xax), numel(sp.xc));
     end
-    plot((1:buffer(2))+kClust*buffer(2), wf, 'Color', cmap(kClust,:)); hold on
-end
-drawnow
+    wctr = 1;
+    for i = ss(1:ceil((n/numWaveforms)):n)'
+        
+        fseek(fid, (i-10)*2*ops.Nchan, 'bof');
+        data = double(fread(fid, buffer, '*int16'));
+        data = data(chanMap,:)';
+        data = bsxfun(@minus, data, mean(data([1:10 (buffer(2)-10):buffer(2)],:)));
+        if isfield(sp, 'yc')
+            wf = bsxfun(@plus, data*ops.bitVolts, 5*flipud(sp.yc)');
+        else
+            wf = data*ops.bitVolts;
+        end
+        
+        if ip.Results.useMean
+            wfs(wctr,:,:) = wf;
+            wctr = wctr + 1;
+        else
+            plot(xax, wf, 'Color', cmap(kClust,:)); hold on
+        end
+    end
+    
+    if ip.Results.useMean
+        mwf = squeeze(mean(wfs));
+        plot(xax, mwf, 'Color', cmap(kClust,:)); hold on
+        
+        %         th = mode(diff(mwf(1,:)))/2;
+%         sd  = squeeze(std(wfs));
+%         sd(sd > th) = nan;
+%         plot(xax, mwf+sd, ':', 'Color', cmap(kClust,:));
+%         plot(xax, mwf-sd, ':', 'Color', cmap(kClust,:));
+    end
+    
+    drawnow
+    
 end
 axis tight
 

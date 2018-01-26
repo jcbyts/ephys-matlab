@@ -1,4 +1,4 @@
-function sp = getSpikes(sess)
+function sp = getSpikes(sess, tag)
 % GET SPIKES gets spike times and cluster info
 % Inputs:
 %   session@struct - session struct
@@ -8,13 +8,16 @@ function sp = getSpikes(sess)
 %   sp = io.getSpikes(sess)
 
 % 2017.08.14    jly     wrote it
+if nargin < 2
+    tag = 'Kilo';
+end
 
 ephys_dirs = dir(fullfile(sess.path, '_shank*'));
 nDirs = numel(ephys_dirs);
 
 sp = {};
 for i = 1:nDirs
-    fspike = fullfile(sess.path, ephys_dirs(i).name, 'sp.mat');
+    fspike = fullfile(sess.path, ephys_dirs(i).name, sprintf('sp-%s.mat', tag));
     if exist(fspike, 'file')
         sp{i} = load(fspike);
     end

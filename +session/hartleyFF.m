@@ -18,67 +18,19 @@ classdef hartleyFF < handle
             
             h.display = PDS{1}.initialParametersMerged.display;
             
-            h.trial = struct();
-            trialNum = 0;
-            
             for i = find(hasStim(:)')
                 
-                trialIx = cellfun(@(x) isfield(x, stim), PDS{i}.data);
+                trial_ = h.importPDS(PDS{i});
                 
-                stimTrials = find(trialIx);
-                
-                if isempty(stimTrials)
+                if isempty(trial_)
                     continue
                 end
                 
-                kxs=PDS{i}.data{stimTrials(1)}.hartley.kxs;
-                kys=PDS{i}.data{stimTrials(1)}.hartley.kys;
-                
-                
-                for j = 1:numel(stimTrials)
-                    thisTrial = stimTrials(j);
-                    
-                    kTrial = trialNum + j;
-                    
-                    h.trial(kTrial).frameTimes = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,1:end-1));
-                    h.trial(kTrial).start      = h.trial(kTrial).frameTimes(1);
-                    h.trial(kTrial).duration   = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,end-1)) - h.trial(kTrial).start;
-                    
-                    if isfield(PDS{i}.conditions{thisTrial}, stim)
-                        if isfield(PDS{i}.conditions{thisTrial}.(stim), 'setupRNG')
-                            if strcmp(PDS{i}.conditions{thisTrial}.(stim).setupRNG, 'frozenSequence')
-                                h.trial(kTrial).frozenSequence = true;
-                                h.trial(kTrial).frozenSequenceLength = PDS{i}.conditions{thisTrial}.(stim).sequenceLength;
-                            else
-                                h.trial(kTrial).frozenSequence = false;
-                                h.trial(kTrial).frozenSequenceLength = nan;
-                            end
-                            
-                        else
-                            h.trial(kTrial).frozenSequence = false;
-                            h.trial(kTrial).frozenSequenceLength = nan;
-                        end
-                        
-                    else
-                        h.trial(kTrial).frozenSequence = false;
-                        h.trial(kTrial).frozenSequenceLength = nan;
-                    end
-                    
-                    h.trial(kTrial).kx         = PDS{i}.data{thisTrial}.(stim).kx;
-                    h.trial(kTrial).ky         = PDS{i}.data{thisTrial}.(stim).ky;
-                    h.trial(kTrial).on         = PDS{i}.data{thisTrial}.(stim).on;
-                    
-                    eyepos = io.getEyePosition(PDS{i}, thisTrial);
-                    h.trial(kTrial).eyeSampleTime = eyepos(:,1);
-                    h.trial(kTrial).eyeXPx        = eyepos(:,2);
-                    h.trial(kTrial).eyeYPx        = eyepos(:,3);
-                    h.trial(kTrial).pupilArea     = eyepos(:,4);
-                end
-                
-                trialNum = kTrial;
+                h.trial = [h.trial; trial_(:)];
                 
             end
             
+
             h.numTrials = numel(h.trial);
             
             
@@ -313,7 +265,87 @@ classdef hartleyFF < handle
                 end
             end
         end
+        
            
+        
+    end
+    
+    methods (Static)
+        
+        function [trial, display] = importPDS(PDS)
+            
+            pdsDate = PDS.initialParametersMerged.session.initTime;
+            
+            if pdsDate > datenum(2018,02,01)
+                trial = [];
+                display = [];
+            else
+                
+                [trial, display] = session.hartleyFF.importPDS_v1(PDS);
+            end
+                
+        end
+        
+        
+        function [trial, display] = importPDS_v1(PDS)
+            
+            trial   = [];
+            display = PDS.initialParametersMerged.display;
+            
+            stim = 'hartley';
+            
+            trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
+                
+                stimTrials = find(trialIx);
+                
+                if isempty(stimTrials)
+                    return;
+                end
+                
+                for j = 1:numel(stimTrials)
+                    thisTrial = stimTrials(j);
+                    
+                    kTrial = j;
+                    
+                    trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
+                    trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                    trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
+                    
+                    if isfield(PDS.conditions{thisTrial}, stim)
+                        if isfield(PDS.conditions{thisTrial}.(stim), 'setupRNG')
+                            if strcmp(PDS.conditions{thisTrial}.(stim).setupRNG, 'frozenSequence')
+                                trial(kTrial).frozenSequence = true;
+                                trial(kTrial).frozenSequenceLength = PDS.conditions{thisTrial}.(stim).sequenceLength;
+                            else
+                                trial(kTrial).frozenSequence = false;
+                                trial(kTrial).frozenSequenceLength = nan;
+                            end
+                            
+                        else
+                            trial(kTrial).frozenSequence = false;
+                            trial(kTrial).frozenSequenceLength = nan;
+                        end
+                        
+                    else
+                        trial(kTrial).frozenSequence = false;
+                        trial(kTrial).frozenSequenceLength = nan;
+                    end
+                    
+                    trial(kTrial).kx         = PDS.data{thisTrial}.(stim).kx;
+                    trial(kTrial).ky         = PDS.data{thisTrial}.(stim).ky;
+                    trial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
+                    trial(kTrial).phi        = PDS.data{thisTrial}.(stim).phi;
+                    trial(kTrial).tf         = PDS.data{thisTrial}.(stim).tf;
+                    
+                    eyepos = io.getEyePosition(PDS, thisTrial);
+                    trial(kTrial).eyeSampleTime = eyepos(:,1);
+                    trial(kTrial).eyeXPx        = eyepos(:,2);
+                    trial(kTrial).eyeYPx        = eyepos(:,3);
+                    trial(kTrial).pupilArea     = eyepos(:,4);
+                end
+            
+        end
+        
         
     end
 end

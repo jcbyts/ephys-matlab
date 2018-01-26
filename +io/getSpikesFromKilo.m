@@ -77,7 +77,9 @@ if exist(fname, 'file')
     clu = clu(~ismember(clu, noiseClusters));
     cgs = cgs(~ismember(cids, noiseClusters));
     cids = cids(~ismember(cids, noiseClusters));
+    savefname = 'sp-Kilo.mat';
 else
+    savefname = 'sp-Kilo.mat';
     cids = unique(clu);
 end
 
@@ -170,7 +172,7 @@ for s = 1:numel(folderNames)
     sp(s).firingRates = spikeCounts'./recordingDuration;
     
     sptmp = sp(s);
-    save(fullfile(folderNames{s}, 'sp.mat'), '-v7.3', '-struct', 'sptmp');
+    save(fullfile(folderNames{s}, savefname), '-v7.3', '-struct', 'sptmp');
     
 end
 

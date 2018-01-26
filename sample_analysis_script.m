@@ -8,7 +8,7 @@ cd C:\Users\Jake\Repos\ephys-matlab\
 addEphysMatlab
 
 %% set session directory
-%oepath = 'C:\Data\Ellie_2017-07-31_15-21-11_Shnkd8';
+oepath = 'C:\Data\Ellie_2017-07-31_15-21-11_Shnkd8';
 % oepath = 'C:\Data\Ellie_2017-08-09_13-04-23_ShankD15MT6';
 %oepath = 'C:\Data\Ellie_2017-08-08_13-41-34_Shank2D14MT5';
  oepath = uigetdir(); % select using GUI
@@ -26,7 +26,7 @@ nShanks = numel(ops);
 for iShank = 1:nShanks
     figure(iShank); clf
     if isfield(sp{iShank}, 'uQ')
-        clusterIds = sp{iShank}.cids(sp{iShank}.uQ>20);
+        clusterIds = sp{iShank}.cids(sp{iShank}.uQ>10);
     else
         clusterIds = [];
     end
@@ -41,8 +41,8 @@ spatialMap = session.squareFlash(PDS);
 
 help session.squareFlash/binSpace % tells you how to use the function
 %% bin space at the resolution you are interested
-window = [-16 16]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
-binSize = 4; %.5; % degrees
+window = [-10 10]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
+binSize = 2; %.5; % degrees
 
 stim = spatialMap.binSpace('window', window, 'binSize', binSize, 'correctEyePos', true);
 
@@ -51,34 +51,58 @@ Xd = spatialMap.buildDesignMatrix(stim, nTimeBins);
 
 
 %% Plot spatial map for each unit
-iShank = 1;
+for iShank = 1:2
 s = sp{iShank};
 if isfield(s, 'uQ')
-    clustIds = s.cids(s.uQ>1);
+    clustIds = s.cids(s.uQ>10);
 else
     clustIds = s.cids;
 end
 nUnits = numel(clustIds);
+figure(iShank*10 + 1); clf
+sx = ceil(sqrt(nUnits));
+sy = round(sqrt(nUnits));
+ax = pdsa.tight_subplot(sy,sx,.001, .001);
 
-kUnit = 1;
+figure(iShank*10 + 2); clf
+ax2 = pdsa.tight_subplot(sy,sx,.001, .001);
+for kUnit = 1:nUnits
 spikeTimes = s.st(s.clu==clustIds(kUnit));
 
 sta = spatialMap.spikeTriggeredAverage(stim, Xd, spikeTimes);
 
-figure; clf
-ax = subplot(1,2,1);
+figure(iShank*10 + 1);
+set(gcf, 'currentaxes', ax(kUnit))
+xgrid = stim.xax(1:2:end);
+
+
+% ax = subplot(1,2,1);
 imagesc(stim.xax, stim.yax, sta.RF); axis xy
 colormap gray
+hold on
+
+% plot([xgrid; xgrid], repmat(xgrid([1 end])', 1, numel(xgrid)), 'y')
+% plot(repmat(xgrid([1 end])', 1, numel(xgrid)), [xgrid; xgrid], 'y')
+plot(xgrid,zeros(size(xgrid)), '+y');
+plot(zeros(size(xgrid)), xgrid, '+y');
 grid on
-ax.GridColor = 'y';
-ax.GridAlpha = .25;
-title('Spatial Map', 'fontweight', 'normal')
-xlabel('degrees')
-ylabel('degrees')
-subplot(1,2,2)
+set(gca, 'GridColor','y');
+set(gca, 'GridAlpha', .25);
+axis off
+% title('Spatial Map', 'fontweight', 'normal')
+% xlabel('degrees')
+% ylabel('degrees')
+% subplot(1,2,2)
+
+figure(iShank*10 + 2)
+set(gcf, 'currentaxes', ax2( kUnit))
 plot(sta.time, sta.RFtime)
-xlabel('Time (seconds)')
-title(sprintf('Unit: %d', kUnit))
+% xlabel('Time (seconds)')
+% title(sprintf('Unit: %d', kUnit))
+axis off
+drawnow
+end
+end
 %% detect saccades
 % This is quick and dirty. We should probably replace this with something
 % more robust. I doubt we want to score every saccade in the GUI, but we
@@ -139,7 +163,7 @@ if ops(iShank).Nchan > 10
     xlabel('ms')
     ylabel('depth')
 end
-
+%%
 % --- saccade-triggered
 eventTimes = saccades(1,:);
 % find saccades that happened more than 200 ms after the last saccade
@@ -210,11 +234,11 @@ if ops(iShank).Nchan > 10
 end
 
 %% ********** spiking locked to saccades **********
-
+iShank = 1;
 figure(3); clf
 s = sp{iShank};
 if isfield(s, 'uQ')
-    goodUnits = s.uQ > 15;
+    goodUnits = s.uQ > 10;
     udepths = s.clusterDepths(goodUnits);
     uId = s.cids(goodUnits);
     [~, depthId] = sort(udepths);
@@ -224,7 +248,10 @@ else
 end
 nUnits = numel(clustId); % including
 
-ax = pdsa.tight_subplot(nUnits, 1, 0.1,  0.1);
+sx = ceil(sqrt(nUnits));
+sy = round(sqrt(nUnits));
+
+ax = pdsa.tight_subplot(sy, sx, 0.01,  0.01);
 for kUnit = 1:nUnits
     st = s.st(s.clu == clustId(kUnit));
     

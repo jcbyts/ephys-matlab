@@ -24,38 +24,72 @@ addEphysMatlab
 %       into headstage 1, and a single electode is plugged into headstage 2
 
 % --- choose the session directory you want to analyze
- oepath = uigetdir();
+oepath = uigetdir();
 
 % --- setup the hardware you used
 clear shank
 
 % setup shank2 (plugged into first headstage)
-shank{1} = hardware.electrode.Shank2;
+%shank{1} = hardware.electrode.Shank2;
 % shank{1} = hardware.electrode.AtlasZifOmnDrive_1;
 % % specify what type of headstage was used
-shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
-shank{1}.name = 'MT';
+%shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
+%shank{1}.name = 'MT';
 
+%shank{2} = hardware.electrode.Shank2;
+% shank{1} = hardware.electrode.AtlasZifOmnDrive_1;
+% % specify what type of headstage was used
+%shank{2}.headstages{1} = hardware.headstage.intan_RHD2132;
+%shank{2}.name = 'MT';
 % For the single electrodes specify a custom channel map using numbers
 % relative to the headstage start. eg., if using ch36 plugged into
 % headstage 2, this should be channel 4 (relative to the start of
 % headstage 2)
 
 % list single electrode channels (this can be a vector if > 1 electrode used)
-%  chanMap = 4;
-%  shank{1} = hardware.electrode.customChannelMap(chanMap);
-%  shank{1}.name = 'Christ-Cap Drive MT';
+  chanMap = [8 25];
+  shank{1} = hardware.electrode.customChannelMap(chanMap);
+  shank{1}.name = 'Christ-Cap Drive MT';
 
 % shank{1} = hardware.electrode.customChannelMap(chanMap);
 % shank{1}.name = 'MtBurrHoleMapping';
 % If you chose hardware.electrode.customChannelMap(chNum), the channel map
 % will be chanMap. That's it. No specifying headstage necessary.
 
+%% print channel map to file
+% fid = fopen('chanmap.txt', 'w');
+% 
+% maxChan = 0;
+% for iShank = 1:2
+%     
+%     % combine headstages if more than one
+%     if numel(shank{iShank}.headstages) == 1
+%         headstage = shank{iShank}.headstages{1};
+%     else
+%         headstage = combineHeadstages(shank{iShank}.headstages);
+%     end
+%    
+%    % build channel map
+%    chanMap = headstage.channelMap(shank{iShank}.channelMap) + maxChan;
+%    xcoords = shank{iShank}.xcoords;
+%    ycoords = shank{iShank}.ycoords;
+%    zcoords = shank{iShank}.zcoords;
+%    
+%    fprintf(fid, 'Array %d\n', iShank);
+%    fprintf(fid, '%d  ', chanMap);
+%    fprintf(fid, '\n');
+%    
+% %    [ops(iShank), info(iShank)] = oe2dat_helper(oepath, shankPaths{iShank}, chanMap, xcoords, ycoords, zcoords); %#ok<NASGU>
+%    
+%    maxChan = maxChan + max(headstage.channelMap);
+% end
+% fclose(fid)
+
 %% Step 1: convert the raw ephys data
 % we represent all of our ephys data as a binary file (integers only) and a
 % *.mat file that specifies how to recover timestamps / voltage from the
 % binary file. 
-
+                                                                                                                                                                                                                                                                                      
 % --- The ops struct
 % Most of the information about the session, probe, and parameters for 
 % spike-sortinf using KiloSort are contained in the ops struct. It is
@@ -82,7 +116,7 @@ shanksToSortWithKilo = find(cellfun(@(x) numel(x.channelMap)>16, shank));
     preprocess.runKiloSort(ops(iShank), 'GPU', true, 'parfor', true, 'verbose', true, 'showfigures', false, 'merge', false);
 
     % run KiloAutomerge
-    preprocess.KiloAutomerge(ops(iShank));
+%     preprocess.KiloAutomerge(ops(iShank));
     
     
     fprintf('--------------------------------------------------------------\n')
@@ -93,7 +127,7 @@ shanksToSortWithKilo = find(cellfun(@(x) numel(x.channelMap)>16, shank));
     fprintf('cd %s\n', ops(iShank).root)
     fprintf('phy template-gui params.py\n')
     commandwindow
-    pause(10)
+    %pause(10)
     fprintf('\n\n')
     fprintf('For keyboard shortcuts and sorting instructions, go to:\n')
     fprintf('http://phy-contrib.readthedocs.io/en/latest/template-gui/#keyboard-shortcuts\n')
@@ -103,6 +137,37 @@ shanksToSortWithKilo = find(cellfun(@(x) numel(x.channelMap)>16, shank));
  end
  
  
+ 
+%% If you want to automerge
+runAutomerge = true;
+
+if runAutomerge
+    
+    for i = 1:numel(shanksToSortWithKilo)
+        iShank = shanksToSortWithKilo(i);
+        
+        % run KiloAutomerge
+        preprocess.KiloAutomerge(ops(iShank));
+        
+        
+        fprintf('--------------------------------------------------------------\n')
+        fprintf('--------------------------------------------------------------\n')
+        fprintf('For manual stage using Phy run "Anaconda Prompt" from the START menu\n')
+        fprintf('Enter the following lines into the prompt:\n\n')
+        fprintf('activate phy\n')
+        fprintf('cd %s\n', ops(iShank).root)
+        fprintf('phy template-gui params.py\n')
+        commandwindow
+        pause(10)
+        fprintf('\n\n')
+        fprintf('For keyboard shortcuts and sorting instructions, go to:\n')
+        fprintf('http://phy-contrib.readthedocs.io/en/latest/template-gui/#keyboard-shortcuts\n')
+        
+        fprintf('importing spikes to matlab\n')
+        io.getSpikesFromKilo(ops(iShank));
+    end
+    
+end
  
  %% Step 3: Spike sort single electrodes (if they exist)
 singleTrodes = find(cellfun(@(x) numel(x.channelMap) < 4, shank));
@@ -115,17 +180,6 @@ if any(singleTrodes)
     end
 end
 
-%% Step 4: Import LFP
-% Loop over sessions and import the local field potential
-% This is really slow because of the line-noise fitting and correction
-ops = io.loadOps(oepath);
-
-overwrite = false;
-plotIt = false;
-for i = 1:numel(ops)
-    io.getLFP(ops(i),overwrite,plotIt);
-end
-
 %% Step 5: Import PLDAPS / eyelink files
 
 % --- load session: This is central to all operations
@@ -136,4 +190,17 @@ PDS = io.getPds(sess, overwrite);
 
 
 [data, timestamps, elInfo] = io.getEdf(sess, PDS, overwrite);
+
+
+
+%% Step 4: Import LFP
+% Loop over sessions and import the local field potential
+% This is really slow because of the line-noise fitting and correction
+ops = io.loadOps(oepath);
+
+overwrite = false;
+plotIt = false;
+for i = 1:numel(ops)
+    io.getLFP(ops(i),overwrite,plotIt);
+end
 

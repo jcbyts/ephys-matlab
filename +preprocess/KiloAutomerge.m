@@ -1,10 +1,11 @@
 function KiloAutomerge(ops)
 % KiloAutomerge(ops)
 
-load(fullfile(ops.root,  'rez.mat'))
+tmp = load(fullfile(ops.root,  'rez.mat'));
+rez = tmp.rez;
 
 fprintf('Attempting Automerge\n')
-rez                = merge_posthoc2(rez); %#ok<NODEF>
+rez                = merge_posthoc3(rez);
 
 fprintf('saving python files for Phy\n')
 

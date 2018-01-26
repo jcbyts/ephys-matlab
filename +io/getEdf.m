@@ -8,7 +8,7 @@ function [data, timestamps, elInfo] = getEdf(sess, PDS, overwrite)
 %   PDS@cell          - cell array of PDS structures
 %   overwrite@logical - flag to reimport
 % Outputs:
-%   data@double       - n x 3 [x y pupil]
+%   data@double       - n x 3 [x y pupil] in degrees
 %   timestamps@double - n x 1 (time in OE time)
 %   elInfo@struct     - meta data
 % Example call:

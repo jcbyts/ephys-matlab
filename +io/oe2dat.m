@@ -75,17 +75,21 @@ for iShank = 1:numShanks
    ycoords = shanks{iShank}.ycoords;
    zcoords = shanks{iShank}.zcoords;
    
-   [ops(iShank), info(iShank)] = oe2dat_helper(oepath, shankPaths{iShank}, chanMap, xcoords, ycoords, zcoords); %#ok<NASGU>
+   [ops(iShank), info(iShank)] = oe2dat_helper(oepath, shankPaths{iShank}, chanMap, xcoords, ycoords, zcoords, ip.Results.verbose, ip.Results.overwrite); %#ok<NASGU>
    
    maxChan = maxChan + max(headstage.channelMap);
 end
 
 
 
-function [ops, info] = oe2dat_helper(oepath, shankName, chanMap, xcoords, ycoords, zcoords, verbose)
+function [ops, info] = oe2dat_helper(oepath, shankName, chanMap, xcoords, ycoords, zcoords, verbose, overwrite)
 
 if ~exist('verbose', 'var')
     verbose = false;
+end
+
+if ~exist('overwrite', 'var')
+    overwrite = false;
 end
 
 % --- declare constants
@@ -99,7 +103,7 @@ fops    = fullfile(oepath, shankName, 'ops.mat');          % spike-sorting struc
 finfo   = fullfile(oepath, shankName, 'ephys_info.mat');   % meta data about the binary
 
 % --- Exit if this has already been run
-if exist(fops, 'file') && ~ip.Results.overwrite
+if exist(fops, 'file') && ~overwrite
     ops  = load(fops);
     info = load(finfo);
     return
@@ -121,7 +125,7 @@ for j = 1:numChannels
     % if separate files are saved by open ephys gui
     tmp_ = dir(fullfile(oepath, sprintf('*CH%d_*.continuous', ch) ));
     
-    fs{j} = [tmp tmp_];
+    fs{j} = [tmp tmp_(:)'];
 end
 
 % -------------------------------------------------------------------------
