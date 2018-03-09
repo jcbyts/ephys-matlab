@@ -10,6 +10,7 @@ function data = getExperimentsAnd(varargin)
 meta = io.getMetaTable;
 
 if nargin == 0 
+    data = meta;
     return
 end
 

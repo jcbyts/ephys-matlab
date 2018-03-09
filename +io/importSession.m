@@ -1,16 +1,85 @@
 function importSession(thisSession)
-% this is a bottom up import of a session. Assumes nothing has been run
-% yet. It will abort if it finds that some
+% this is a bottom up import of a session. Some things may already have
+% been run. 
+% call by passing in an existing session meta data or by starting from
+% scratch
+% example calls:
+% meta = io.getMetaTable();
+% 
+% io.importSession(meta(10,:)); % run import on session 10 from the meta
+%                               table
+% 
+% or 
+% io.importSession(); % no arguments lets you select things
+
 
 SERVER_DATA_DIR = getpref('EPHYS', 'SERVER_DATA');
-disp(thisSession)
 
-if isnan(thisSession.Electrode{1})
-    disp('No electrode data. skipping.')
-	return
+if nargin == 0 % no session passed in
+    % use gui to select session
+    directoryname = uigetdir(SERVER_DATA_DIR, 'Pick session to import');
+    meta = io.getMetaTable();
+    directory = strrep(directoryname, SERVER_DATA_DIR, ''); % path relative to server data dir
+    sessionix = find(strcmp(meta.Directory, directory));
+    if isempty(sessionix) % session does not exist yet
+        pat = '(?<subject>\D+)\_(?<date>[\d-]+)\_(?<time>[\d-]+)\_(?<note>[^]+)';
+        s = regexp(directory, pat, 'names'); % build sesion from filename
+        assert(~isempty(s.subject), 'This is not a session') % TODO: this should be a more robust check
+        
+        % get the current variable names in the meta table
+        tableColumns = meta.Properties.VariableNames;
+        tableValues  = repmat({nan}, 1, numel(tableColumns)); % populate empty values
+        
+        % --- populate specifics we can know from the file name
+        
+        % subject name
+        ix = strcmp(tableColumns, 'Subject');
+        tableValues{ix} = s.subject;
+        
+        % date
+        ix = strcmp(tableColumns, 'Date');
+     
+        dstr = cellfun(@str2double, regexp(s.date, '-', 'split'), 'uni', false);
+        tableValues{ix} = datestr(datenum(dstr{:}), 'mm/dd/yyyy');
+        
+        % directory
+        ix = strcmp(tableColumns, 'Directory');
+        tableValues{ix} = directory;
+        
+        % time
+        ix = strcmp(tableColumns, 'Time');
+        tableValues{ix} = strrep(s.time, '-', ':');
+        
+        % tag
+        ix = strcmp(tableColumns, 'Tag');
+        tableValues{ix} = s.note;
+        
+        
+        thisSession = cell2table(tableValues, 'VariableNames', tableColumns);
+        
+        
+    else % session has already been added to the meta file. Load what is already there
+        thisSession = meta(sessionix,:);
+    end
+        
+keyboard
 end
 
-shank = hardware.electrodeFactory(thisSession.Electrode{1});
+
+disp(thisSession)
+
+electrodeName = thisSession.Electrode;
+if iscell(electrodeName)
+    electrodeName = electrodeName{1};
+end
+
+if isnan(electrodeName)
+    disp('No electrode data. Select from list of available.')
+    shank = hardware.electrodeFactory();
+else
+    shank = hardware.electrodeFactory(electrodeName);
+end
+
 
 oepath = fullfile(SERVER_DATA_DIR, thisSession.Directory{1});
 
