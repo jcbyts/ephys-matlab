@@ -20,6 +20,8 @@ try
         PDS = tmp.PDS;
         return
     end
+catch
+    warning('Failed to load PDS. Going to try re-importing')
 end
 
 pdsList = io.getPdsFileList(sessionInfo);
@@ -78,5 +80,23 @@ if ~exist(behaviorDir, 'dir')
     mkdir(behaviorDir)
 end
 
-save(fullfile(behaviorDir, 'PDS.mat'), 'PDS')
+
+% remove figures embedded within the PDS files (they are big!)
+for iFile = 1:numel(PDS)
+    if isempty(PDS{iFile}.functionHandles)
+        continue
+    else
+        fn_ = fieldnames(PDS{iFile}.functionHandles);
+        for k = 1:numel(fn_)
+%             disp(class(fn_{k}))
+            if isa(PDS{iFile}.functionHandles.(fn_{k}), 'matlab.ui.Figure')
+                PDS{iFile}.functionHandles.(fn_{k}) = [];
+                disp('Removing figure from file')
+            end
+        end
+    end
+end
+
+fprintf('Saving PDS files out as a mat file\n')
+save(fullfile(behaviorDir, 'PDS.mat'), 'PDS', '-v7.3')
 
