@@ -23,6 +23,9 @@ if nargin < 4
     end
 end
 
+assert(all(mod(fn(:),1)==0), 'fragments must be integers')
+assert(numel(ts)==numel(fn), 'num fragments must equal num timestamps')
+
 nfragments = numel(fn);
 fb = ts;
 fe = (ts+fn/adfreq);
