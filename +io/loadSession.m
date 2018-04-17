@@ -14,6 +14,10 @@ function [sessionInfo, ops, info] = loadSession(oepath)
 %   meta = io.getExperimentsAnd('Subject', 'Ellie', 'StimulusProtocols', 'hartleyFF');
 %   [sessionInfo, ops, info] = io.loadSession(meta(1,:))
 
+if nargin == 0
+    oepath = uigetdir(getpref('EPHYS', 'SERVER_DATA'));
+end
+
 if istable(oepath)
     oepath = fullfile(getpref('EPHYS', 'SERVER_DATA'), oepath.Directory{1});
 end
