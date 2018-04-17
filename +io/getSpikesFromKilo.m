@@ -1,4 +1,26 @@
 function sp = getSpikesFromKilo(ops, info)
+% getSpikesFromKilo gets the spike sorting output from Kilosort
+% requires the spikeTools from cortexlab github
+
+if isa(ops, 'table')
+    assert(any(strcmp(ops.SpikeSorting, 'Kilo')), 'Kilosort has not been run on this session')
+    ops = io.loadOps(ops);
+    sp = [];
+    for i = 1:numel(ops)
+        try
+            sp = [sp get_spikes_kilo_helper(ops(i))];
+        end
+    end
+    
+else
+    if ~exist('info', 'var')
+        info = load(fullfile(ops.root, 'ephys_info.mat'));
+    end
+    sp = get_spikes_kilo_helper(ops, info);
+end
+
+
+function sp = get_spikes_kilo_helper(ops, info)
 
 if nargin < 2
     info = load(fullfile(ops.root, 'ephys_info.mat'));
@@ -63,36 +85,13 @@ tempScalingAmps = readNPY(fullfile(folderNames{f},  'amplitudes.npy'));
 %
 % Note this function is included in the folder with this data (and also the
 % "spikes" repository)
-fname = fullfile(folderNames{f},  'cluster_groups.csv');
-if exist(fname, 'file')
-    [cids, cgs] = readClusterGroupsCSV(fname);
-    
-    % find and discard spikes corresponding to noise clusters
-    noiseClusters = cids(cgs==0);
-    
-    st = st(~ismember(clu, noiseClusters));
-    ss = ss(~ismember(clu, noiseClusters));
-    spikeTemplates = spikeTemplates(~ismember(clu, noiseClusters));
-    tempScalingAmps = tempScalingAmps(~ismember(clu, noiseClusters));
-    clu = clu(~ismember(clu, noiseClusters));
-    cgs = cgs(~ismember(cids, noiseClusters));
-    cids = cids(~ismember(cids, noiseClusters));
-    savefname = 'sp-Kilo.mat';
-else
-    savefname = 'sp-Kilo.mat';
-    cids = unique(clu);
-end
 
 [cgs2, uQ, cR, isiV] = sqKilosort.computeAllMeasures(folderNames{f});
-bad = cgs2==0;
-cgs2(bad) = [];
-uQ(bad) = [];
-cR(bad) = [];
-isiV(bad) = [];
 
-if ~exist('cgs', 'var')
-    cgs = cgs2;
-end
+
+% if ~exist('cgs', 'var')
+%     cgs = cgs2;
+% end
 
 % temps are the actual template waveforms. It is nTemplates x nTimePoints x
 % nChannels (in this case 1536 x 82 x 374). These should be basically
@@ -114,7 +113,61 @@ winv = readNPY(fullfile(folderNames{f},  'whitening_mat_inv.npy'));
 % 512 is the bit range (-512 to +512, 10bits)
 % 500 is the gain factor I recorded with 
 % 1e6 converts from volts to uV
-spikeAmps = spikeAmps*0.6/512/500*1e6; 
+% spikeAmps = spikeAmps*0.6/512/500*1e6;
+spikeAmps = spikeAmps * info.bitVolts;
+fname = fullfile(folderNames{f},  'cluster_groups.csv');
+if exist(fname, 'file')
+    [cids, cgs] = readClusterGroupsCSV(fname);
+    
+else
+    cids = unique(clu);
+    cgs = cgs2;
+end
+    
+    spikeCounts = zeros(1, numel(cids));
+    for iUnit = 1:numel(cids)
+        spikeCounts(iUnit) = sum(clu==cids(iUnit));
+    end
+    
+    
+    
+%     % find and discard spikes corresponding to noise clusters
+%     noiseClusters = cids(cgs==0);
+%     
+%     st = st(~ismember(clu, noiseClusters));
+%     ss = ss(~ismember(clu, noiseClusters));
+%     spikeTemplates = spikeTemplates(~ismember(clu, noiseClusters));
+%     tempScalingAmps = tempScalingAmps(~ismember(clu, noiseClusters));
+%     clu = clu(~ismember(clu, noiseClusters));
+%     cgs = cgs(~ismember(cids, noiseClusters));
+%     cids = cids(~ismember(cids, noiseClusters));
+%     savefname = 'sp-Kilo.mat';
+    
+notNoiseClusters = cids(cgs~=0 & cids ~=0 & spikeCounts~=0);
+bigix   = ismember(clu, notNoiseClusters);
+smallix = ismember(cids, notNoiseClusters);
+st = st(bigix);
+ss = ss(bigix);
+spikeTemplates   = spikeTemplates(bigix);
+tempScalingAmps  = tempScalingAmps(bigix);
+spikeAmps        = spikeAmps(bigix);
+spikeDepths      = spikeDepths(bigix);
+
+clu = clu(bigix);
+
+cgs  = cgs(smallix);
+cids = cids(smallix);
+uQ   = uQ(smallix);
+cR   = cR(smallix);
+isiV = isiV(smallix);
+
+savefname = 'sp-Kilo.mat';
+    
+% else
+%     savefname = 'sp-Kilo.mat';
+%     cids = unique(clu);
+% end
+
 
 sp(f).name = folderNames{f};
 sp(f).clu = clu;
@@ -135,8 +188,6 @@ sp(f).tempAmps = tempAmps;
 sp(f).spikeDepths = spikeDepths;
 sp(f).tempsUnW = tempsUnW;
 
-
-assert(all(sp(f).cgs == cgs2), 'Quality Rating does not match')
 sp(f).cgs2 = cgs2;
 sp(f).uQ = uQ;
 sp(f).cR = cR;
@@ -158,6 +209,10 @@ for s = 1:numel(folderNames)
     % array, the values of any duplicate indices are added. So this is the
     % fastest way I know to make the sum of the entries of sd for each of
     % the unique entries of clu
+%     spikeCounts = zeros(numel(cids),1);
+%     for iUnit = 1:numel(cids)
+%         spikeCounts(iUnit) = sum(clu==cids(iUnit));
+%     end
     [cids, spikeCounts] = countUnique(clu);    
     q = full(sparse(double(clu+1), ones(size(clu)), sd));
     q = q(cids+1);
