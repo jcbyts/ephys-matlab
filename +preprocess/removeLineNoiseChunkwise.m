@@ -32,6 +32,12 @@ function [newdata] = removeLineNoiseChunkwise(data,sr,freqs,freqrange,chunksize,
  
     chunksize = chunksize*sr;
     
+    % later we will compute indices based on chunksize and they must be
+    % round numbers
+    if mod(chunksize,2) ~= 0
+        chunksize = chunksize-1;
+    end
+    
     n = numel(data);
     if chunksize > n
         chunksize = n;
@@ -48,18 +54,21 @@ function [newdata] = removeLineNoiseChunkwise(data,sr,freqs,freqrange,chunksize,
     nchunks = nchunks*2-1;
     thewin = (0:chunksize/2-1)'/(chunksize/2-1);
     thewin = [thewin;thewin(end:-1:1)];
- 
+    if numel(thewin) < chunksize
+        thewin(end+1) = 0;
+    end
     %Deline each chunk and reassemble
     pss = nan(5,nchunks);
     for ii = 1:nchunks
-        thechunk = data((ii-1)*chunksize/2+(1:chunksize));
+        iix = (ii-1)*floor(chunksize/2)+(1:chunksize);
+        thechunk = data(iix);
         [delinedchunk,pss] = delineChunk(thechunk,sr,showOutput,freqs,freqrange,pss);
-        newdata((ii-1)*chunksize/2+(1:chunksize)) = ...
-            newdata((ii-1)*chunksize/2+(1:chunksize)) + ...
+        newdata(iix) = ...
+            newdata(iix) + ...
             delinedchunk.*thewin;
     end
  
-    newdata = newdata(chunksize/2 + (1:origlen));
+    newdata = newdata(floor(chunksize/2) + (1:origlen));
 end
  
 %Deline a single chunk of data
