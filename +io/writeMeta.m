@@ -106,8 +106,11 @@ for iSession = 1:nNew
     
 end
 
-
-reply = input('Do you want to overwrite the meta data file? (1 or 0)');
+if overwrite==2
+    reply = true;
+else
+    reply = input('Do you want to overwrite the meta data file? (1 or 0)');
+end
 
 if reply
     C = table2cell(meta); C = [meta.Properties.VariableNames; C];
