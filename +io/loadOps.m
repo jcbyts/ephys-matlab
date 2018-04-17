@@ -8,6 +8,10 @@ function ops = loadOps(fpath)
 %   oepath = 'C:\Data\Ellie_2017-08-09_13-04-23_ShankD15MT6';
 %   ops = io.loadOps(oepath);
 
+if isa(fpath, 'table')
+    fpath = fullfile(getpref('EPHYS', 'SERVER_DATA'), fpath.Directory{1});
+end
+
 warning('off')
 shankDirs = dir(fullfile(fpath, '_shank*'));
 
