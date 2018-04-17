@@ -56,13 +56,12 @@ if nargin == 0 % no session passed in
         
         
         thisSession = cell2table(tableValues, 'VariableNames', tableColumns);
-        
+        thisSession.Time = datenum(thisSession.Time{1}, 'HH:MM:SS');
         
     else % session has already been added to the meta file. Load what is already there
         thisSession = meta(sessionix,:);
     end
         
-keyboard
 end
 
 
@@ -85,36 +84,40 @@ oepath = fullfile(SERVER_DATA_DIR, thisSession.Directory{1});
 
 % check if import has already been run
 derived = dir(fullfile(oepath, '_*'));
-try
-    for iDir = 1:numel(derived)
-        ops_old = io.loadOps(oepath);
+
+% This ensures that if the import has already been run, the ops files are
+% named appropriately for where they currently live
+for iDir = 1:numel(derived)
+    ops_old = io.loadOps(oepath);
+    
+    for i = 1:numel(ops_old)
+        o = ops_old(i);
         
-        for i = 1:numel(ops_old)
-            o = ops_old(i);
-            
-            o = io.convertOpsToNewDirectory(o, oepath);
-            
-            save(fullfile(o.root, 'ops.mat'), '-v7.3', '-struct', 'o')
-        end
+        o = io.convertOpsToNewDirectory(o, oepath);
+        
+        save(fullfile(o.root, 'ops.mat'), '-v7.3', '-struct', 'o')
     end
 end
+
 
 io.oe2dat(oepath, shank, 'overwrite', false, 'verbose', true);
 
 thisSession.oe2dat = true;
+
 % --- load session: This is central to all operations
 sess = io.loadSession(oepath);
 
-
-
+% important!! make sure you are on the right version of the stimulus code
 overwrite = false; % if it breaks, run again with true
 PDS = io.getPds(sess, overwrite);
 
+if isempty(PDS)
+    warning('missing PDS files?')
+else
+    io.getEdf(sess, PDS, overwrite);
+end
 
-io.getEdf(sess, PDS, overwrite);
-
-
-%% Step 4: Import LFP
+% Step 4: Import LFP
 % Loop over sessions and import the local field potential
 % This is really slow because of the line-noise fitting and correction
 ops = io.loadOps(oepath);
@@ -128,4 +131,4 @@ if info.phaseCorrection
     thisSession.LfpPhaseCorrection = true;
 end
 
-io.writeMeta(thisSession)
+io.writeMeta(thisSession, 2) % overwrite everything without prompt
