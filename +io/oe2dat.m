@@ -22,7 +22,7 @@ end
 % --- parse optional arguments
 ip = inputParser();
 ip.addParameter('overwrite', false)
-ip.addParameter('verbose', false)
+ip.addParameter('verbose', true)
 ip.parse(varargin{:});
 
 % -------------------------------------------------------------------------
@@ -54,6 +54,7 @@ for i = 1:numShanks
     end
 end
 
+% overwrite session info??
 save(fsess, 'sessionInfo')
 
 maxChan = 0;
@@ -75,7 +76,7 @@ for iShank = 1:numShanks
    ycoords = shanks{iShank}.ycoords;
    zcoords = shanks{iShank}.zcoords;
    
-   [ops(iShank), info(iShank)] = oe2dat_helper(oepath, shankPaths{iShank}, chanMap, xcoords, ycoords, zcoords, ip.Results.verbose, ip.Results.overwrite); %#ok<NASGU>
+   [ops(iShank), info(iShank)] = oe2dat_helper(oepath, shankPaths{iShank}, chanMap, xcoords, ycoords, zcoords, ip.Results.verbose, ip.Results.overwrite);
    
    maxChan = maxChan + max(headstage.channelMap);
 end
