@@ -19,7 +19,7 @@ if ~exist('inds', 'var') || isempty(inds)
     inds = 1:nTotSamp;
     bufferSize = [Nchan nTotSamp];
 else
-    fseek(fid, inds(1)*Nchan, 'bof');
+    fseek(fid, 2*inds(1)*Nchan, 'bof');
     bufferSize = [Nchan inds(end)-(inds(1)-1)];
 end
 

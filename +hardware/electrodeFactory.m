@@ -2,6 +2,7 @@ function shank = electrodeFactory(name)
 % This builds the probe files that we use to handle channel maps and
 % filtering corrections
 
+% if no argument is passed in, use the gui to choose from a list of options
 if nargin == 0
     shankList = {'Shank2', ...
         'AcuteZif2Om32', ...
@@ -19,6 +20,8 @@ if nargin == 0
     end
 end
 
+% electrode options are specified here. Follow the existing examples to
+% create new ones.
 switch name
     case 'Shank2'
         

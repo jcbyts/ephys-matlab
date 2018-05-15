@@ -16,6 +16,10 @@ classdef squareFlash < handle
             
             hasStim = io.findPDScontainingStimModule(PDS, stim);
             
+            if ~any(hasStim)
+                return
+            end
+            
             h.display = PDS{1}.initialParametersMerged.display;
             
             h.trial = struct();

@@ -1,4 +1,4 @@
-function importSession(thisSession)
+function thisSession = importSession(thisSession)
 % this is a bottom up import of a session. Some things may already have
 % been run. 
 % call by passing in an existing session meta data or by starting from
@@ -16,12 +16,19 @@ function importSession(thisSession)
 SERVER_DATA_DIR = getpref('EPHYS', 'SERVER_DATA');
 
 if nargin == 0 % no session passed in
+    fprintf('No session passed in. Use the GUI to select a folder to import\n')
     % use gui to select session
     directoryname = uigetdir(SERVER_DATA_DIR, 'Pick session to import');
     meta = io.getMetaTable();
     directory = strrep(directoryname, SERVER_DATA_DIR, ''); % path relative to server data dir
     sessionix = find(strcmp(meta.Directory, directory));
     if isempty(sessionix) % session does not exist yet
+        disp('The session does not exist in the meta data table yet.')
+        disp('Using the directory naming convention to add it.')
+        disp('Note: if the convention was not followed, the name will be incorrect')
+        
+        % use regular expressions to figure out the session name, date,
+        % time, 
         pat = '(?<subject>\D+)\_(?<date>[\d-]+)\_(?<time>[\d-]+)\_(?<note>[^]+)';
         s = regexp(directory, pat, 'names'); % build sesion from filename
         assert(~isempty(s.subject), 'This is not a session') % TODO: this should be a more robust check
@@ -99,7 +106,7 @@ for iDir = 1:numel(derived)
     end
 end
 
-
+disp('Converting the Open Ephys files to a single binary file.')
 io.oe2dat(oepath, shank, 'overwrite', false, 'verbose', true);
 
 thisSession.oe2dat = true;
@@ -112,8 +119,10 @@ overwrite = false; % if it breaks, run again with true
 PDS = io.getPds(sess, overwrite);
 
 if isempty(PDS)
-    warning('missing PDS files?')
+    warning('No PDS files were found. missing PDS files?')
 else
+    % converts eyelink files to *.mat files
+    % TODO: include module for arrington
     io.getEdf(sess, PDS, overwrite);
 end
 
@@ -131,4 +140,4 @@ if info.phaseCorrection
     thisSession.LfpPhaseCorrection = true;
 end
 
-io.writeMeta(thisSession, 2) % overwrite everything without prompt
+io.writeMeta(thisSession, 2) % 2 means overwrite everything without prompt

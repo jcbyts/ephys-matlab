@@ -23,6 +23,9 @@ classdef mtDotRcMap < handle
             
             
             hasStim = io.findPDScontainingStimModule(PDS, stim);
+            if ~any(hasStim)
+                return
+            end
             
             m.display = PDS{find(hasStim,1)}.initialParametersMerged.display;
             

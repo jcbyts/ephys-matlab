@@ -16,6 +16,10 @@ classdef hartleyFF < handle
             
             hasStim = io.findPDScontainingStimModule(PDS, stim);
             
+            if ~any(hasStim)
+                return
+            end
+            
             h.display = PDS{1}.initialParametersMerged.display;
             
             for i = find(hasStim(:)')
@@ -241,7 +245,9 @@ classdef hartleyFF < handle
             hartleyTrial = h.trial;
             frozenTrials = find([h.trial.frozenSequence]);
             if any(frozenTrials)
-                sequenceStarts = cell2mat(arrayfun(@(x) x.frameTimes(1:x.frozenSequenceLength:end)', hartleyTrial(frozenTrials), 'UniformOutput', false)');
+                tmp = arrayfun(@(x) x.frameTimes(1:x.frozenSequenceLength:end)', hartleyTrial(frozenTrials), 'UniformOutput', false)';
+                tmp = cellfun(@(x) x(:), tmp(:), 'uni', false);
+                sequenceStarts = cell2mat(tmp);
                 
                 cmap = lines(nUnits);
                 
@@ -256,7 +262,7 @@ classdef hartleyFF < handle
                     
                     uIx = s.cids==clustId(kUnit);
                     
-                    if isfield(s, 'uQ') && s.uQ(uIx)>20 && s.cR(uIx) < .2
+                    if isfield(s, 'cgs') && s.cgs(uIx)==3
                         plot(bcenters(j), i-numel(sequenceStarts)*(kUnit-1), '.', 'Color', cmap(kUnit,:)); hold on
                     else
                         plot(bcenters(j), i-numel(sequenceStarts)*(kUnit-1), '.', 'Color', repmat(.5, 1, 3)); hold on
@@ -264,6 +270,11 @@ classdef hartleyFF < handle
                     
                 end
             end
+            
+%             for i = frozenTrials(:)'
+%                 
+%                plot(h.trial(i).eyeSampleTime,  [h.trial(i).eyeXPx, h.trial(i).eyeYPx], 'k');
+%             end
         end
         
            
