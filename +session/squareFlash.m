@@ -16,78 +16,26 @@ classdef squareFlash < handle
             
             hasStim = io.findPDScontainingStimModule(PDS, stim);
             
+            hasStim = hasStim | io.findPDScontainingStimModule(PDS, 'spatialSquares');
+            
             if ~any(hasStim)
                 return
             end
             
-            h.display = PDS{1}.initialParametersMerged.display;
-            
-            h.trial = struct();
-            trialNum = 0;
-            
-            ppd = PDS{1}.initialParametersMerged.display.ppd;
-            
+            h.display = PDS{find(hasStim,1)}.initialParametersMerged.display;
+                                    
             for i = find(hasStim(:)')
                 
-                trialIx = cellfun(@(x) isfield(x, stim), PDS{i}.data);
+                trial_ = h.importPDS(PDS{i});
                 
-                stimTrials = find(trialIx);
-                
-                if isempty(stimTrials)
+                if isempty(trial_)
                     continue
                 end
                 
-                
-                
-                for j = 1:numel(stimTrials)
-                    thisTrial = stimTrials(j);
-                    
-                    kTrial = trialNum + j;
-                    
-                    h.trial(kTrial).frameTimes = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,1:end-1));
-                    h.trial(kTrial).start      = h.trial(kTrial).frameTimes(1);
-                    h.trial(kTrial).duration   = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,end-1)) - h.trial(kTrial).start;
-                    
-                    h.trial(kTrial).pos        = PDS{i}.data{thisTrial}.(stim).pos;
-                    
-                    eyepos = io.getEyePosition(PDS{i}, thisTrial);
-                    h.trial(kTrial).eyeSampleTime = eyepos(:,1);
-                    h.trial(kTrial).eyeXPx        = eyepos(:,2);
-                    h.trial(kTrial).eyeYPx        = eyepos(:,3);
-                    h.trial(kTrial).pupilArea     = eyepos(:,4);
-                    
-                    % --- additional eye position analyses
-                    %                     results = pdsa.detectSaccades(eyepos(:,1)', eyepos(:,2:3)'./ppd, 'verbose', false);
-                    
-                    
-                    
-                    iix = h.trial(kTrial).eyeXPx < 200 | h.trial(kTrial).eyeXPx > 1800;
-                    iiy = h.trial(kTrial).eyeYPx < 100 | h.trial(kTrial).eyeXPx > 1000;
-                    bad = iix | iiy;
-                    
-                    h.trial(kTrial).eyeXPx(bad) = nan;
-                    h.trial(kTrial).eyeYPx(bad) = nan;
-                    h.trial(kTrial).pupilArea(bad) = nan;
-                    
-                    % find eye position on each frame
-                    t = h.trial(kTrial).frameTimes - h.trial(kTrial).start;
-                    tdiff = abs(bsxfun(@minus, h.trial(kTrial).eyeSampleTime, t(:)')) < mean(diff(h.trial(kTrial).eyeSampleTime));
-                    [irow,~] = find(diff(tdiff)==-1);
-                    
-                    %                     h.trial(kTrial).saccades = false(size(h.trial(kTrial).frameTimes));
-                    %
-                    %                     for iSaccade = 1:size(results,2)
-                    %                         ix = t > results(1, iSaccade) & t < results(2,iSaccade);
-                    %                         h.trial(kTrial).saccades(ix) = true;
-                    %                     end
-                    
-                    h.trial(kTrial).eyePosAtFrame = [h.trial(kTrial).eyeXPx(irow) h.trial(kTrial).eyeYPx(irow)];
-                    
-                end
-                
-                trialNum = kTrial;
+                h.trial = [h.trial; trial_(:)];
                 
             end
+            
             
             h.numTrials = numel(h.trial);
             
@@ -471,7 +419,7 @@ classdef squareFlash < handle
                 
                 % rehsape into column vector
                 y = y(:);
-%                 y = y-mean(y);
+                %                 y = y-mean(y);
                 y = zscore(y);
                 ys = smooth(y, 20); % smooth y to start
                 ny = numel(y);
@@ -482,18 +430,18 @@ classdef squareFlash < handle
                 sta.ny = numel(ys);
                 
                 
-%                 fprintf('\n\n...Running Automatic ridge regression on space...\n');
+                %                 fprintf('\n\n...Running Automatic ridge regression on space...\n');
                 
                 nks = [stim.size];
                 
                 qf = qfsmooth(nks(1), nks(2));
                 
-% %                 folds = getcvfolds(numel(y), 5, 10001);
-% %                 X = [stim.X ones(ny,1)];
-% %                 opts = struct();
-% %                 opts.family = 'poissexp';
-% %                 
-% %                 kspace = cvglmfitqp(round(ys), X, qf, folds, opts);
+                % %                 folds = getcvfolds(numel(y), 5, 10001);
+                % %                 X = [stim.X ones(ny,1)];
+                % %                 opts = struct();
+                % %                 opts.family = 'poissexp';
+                % %
+                % %                 kspace = cvglmfitqp(round(ys), X, qf, folds, opts);
                 
                 dd.xx = stim.X'*stim.X;   % stimulus auto-covariance
                 dd.xy = (stim.X'*ys); % stimulus-response cross-covariance
@@ -707,6 +655,158 @@ classdef squareFlash < handle
         %         end
         
         
+        
+    end
+    
+    methods (Static)
+        
+        function [trial, display] = importPDS(PDS)
+            
+            pdsDate = PDS.initialParametersMerged.session.initTime;
+            if isfield(PDS.initialParametersMerged.git, 'pep')
+                
+                if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
+                    
+                    if pdsDate > datenum(2018, 02, 01)
+                        [trial, display] = session.squareFlash.importPDS_v2(PDS);
+                    else
+                        error('unknown version')
+                    end
+                    
+                else
+                    error('unknown version')
+                end
+            else
+                [trial, display] = session.squareFlash.importPDS_v1(PDS);
+            end
+            
+        end
+        
+        function [trial, display] = importPDS_v2(PDS)
+            
+            trial   = [];
+            display = PDS.initialParametersMerged.display;
+            
+            stim = 'spatialSquares';
+            
+            trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
+            
+            stimTrials = find(trialIx);
+            
+            if isempty(stimTrials)
+                return;
+            end
+            
+            for j = 1:numel(stimTrials)
+                thisTrial = stimTrials(j);
+                
+                kTrial = j;
+                
+                trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
+                trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
+                
+                trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
+                
+                eyepos = io.getEyePosition(PDS, thisTrial);
+                trial(kTrial).eyeSampleTime = eyepos(:,1);
+                trial(kTrial).eyeXPx        = eyepos(:,2);
+                trial(kTrial).eyeYPx        = eyepos(:,3);
+                trial(kTrial).pupilArea     = eyepos(:,4);
+                
+                % --- additional eye position analyses
+                %                     results = pdsa.detectSaccades(eyepos(:,1)', eyepos(:,2:3)'./ppd, 'verbose', false);
+                
+                
+                
+                iix = trial(kTrial).eyeXPx < 200 | trial(kTrial).eyeXPx > 1800;
+                iiy = trial(kTrial).eyeYPx < 100 | trial(kTrial).eyeXPx > 1000;
+                bad = iix | iiy;
+                
+                trial(kTrial).eyeXPx(bad) = nan;
+                trial(kTrial).eyeYPx(bad) = nan;
+                trial(kTrial).pupilArea(bad) = nan;
+                
+                % find eye position on each frame
+                t = trial(kTrial).frameTimes - trial(kTrial).start;
+                tdiff = abs(bsxfun(@minus, trial(kTrial).eyeSampleTime, t(:)')) < mean(diff(trial(kTrial).eyeSampleTime));
+                [irow,~] = find(diff(tdiff)==-1);
+                
+                %                     trial(kTrial).saccades = false(size(trial(kTrial).frameTimes));
+                %
+                %                     for iSaccade = 1:size(results,2)
+                %                         ix = t > results(1, iSaccade) & t < results(2,iSaccade);
+                %                         trial(kTrial).saccades(ix) = true;
+                %                     end
+                
+                trial(kTrial).eyePosAtFrame = [trial(kTrial).eyeXPx(irow) trial(kTrial).eyeYPx(irow)];
+                
+            end
+            
+        end
+        
+        function [trial, display] = importPDS_v1(PDS)
+            
+            trial   = [];
+            display = PDS.initialParametersMerged.display;
+            
+            stim = 'SpatialMapping';
+            
+            trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
+            
+            stimTrials = find(trialIx);
+            
+            if isempty(stimTrials)
+                return;
+            end
+            
+            for j = 1:numel(stimTrials)
+                thisTrial = stimTrials(j);
+                
+                kTrial = j;
+                
+                trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
+                trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
+                
+                trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
+                
+                eyepos = io.getEyePosition(PDS, thisTrial);
+                trial(kTrial).eyeSampleTime = eyepos(:,1);
+                trial(kTrial).eyeXPx        = eyepos(:,2);
+                trial(kTrial).eyeYPx        = eyepos(:,3);
+                trial(kTrial).pupilArea     = eyepos(:,4);
+                
+                % --- additional eye position analyses
+                %                     results = pdsa.detectSaccades(eyepos(:,1)', eyepos(:,2:3)'./ppd, 'verbose', false);
+                
+                
+                
+                iix = trial(kTrial).eyeXPx < 200 | trial(kTrial).eyeXPx > 1800;
+                iiy = trial(kTrial).eyeYPx < 100 | trial(kTrial).eyeXPx > 1000;
+                bad = iix | iiy;
+                
+                trial(kTrial).eyeXPx(bad) = nan;
+                trial(kTrial).eyeYPx(bad) = nan;
+                trial(kTrial).pupilArea(bad) = nan;
+                
+                % find eye position on each frame
+                t = trial(kTrial).frameTimes - trial(kTrial).start;
+                tdiff = abs(bsxfun(@minus, trial(kTrial).eyeSampleTime, t(:)')) < mean(diff(trial(kTrial).eyeSampleTime));
+                [irow,~] = find(diff(tdiff)==-1);
+                
+                %                     trial(kTrial).saccades = false(size(trial(kTrial).frameTimes));
+                %
+                %                     for iSaccade = 1:size(results,2)
+                %                         ix = t > results(1, iSaccade) & t < results(2,iSaccade);
+                %                         trial(kTrial).saccades(ix) = true;
+                %                     end
+                
+                trial(kTrial).eyePosAtFrame = [trial(kTrial).eyeXPx(irow) trial(kTrial).eyeYPx(irow)];
+                
+            end
+            
+        end
         
     end
 end

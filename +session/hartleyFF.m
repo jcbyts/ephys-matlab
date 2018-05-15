@@ -286,17 +286,81 @@ classdef hartleyFF < handle
         function [trial, display] = importPDS(PDS)
             
             pdsDate = PDS.initialParametersMerged.session.initTime;
-            
-            if pdsDate > datenum(2018,02,01)
-                trial = [];
-                display = [];
-            else
+            if isfield(PDS.initialParametersMerged.git, 'pep')
                 
+                if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
+                    
+                    if pdsDate > datenum(2018, 02, 01)
+                        [trial, display] = session.hartleyFF.importPDS_v2(PDS);
+                    else
+                        error('unknown version')
+                    end
+                    
+                else
+                    error('unknown version')
+                end
+            else
                 [trial, display] = session.hartleyFF.importPDS_v1(PDS);
             end
                 
         end
         
+        function [trial, display] = importPDS_v2(PDS)
+            trial = [];
+            display = PDS.initialParametersMerged.display;
+            
+            
+             stim = 'hartley';
+            
+            trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
+                
+                stimTrials = find(trialIx);
+                
+                if isempty(stimTrials)
+                    return;
+                end
+                
+                for j = 1:numel(stimTrials)
+                    thisTrial = stimTrials(j);
+                    
+                    kTrial = j;
+                    
+                    trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
+                    trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                    trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
+                   
+                    trial(kTrial).kx         = PDS.data{thisTrial}.(stim).kx;
+                    trial(kTrial).ky         = PDS.data{thisTrial}.(stim).ky;
+                    trial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
+                    trial(kTrial).phi        = PDS.data{thisTrial}.(stim).phi;
+                    trial(kTrial).tf         = PDS.data{thisTrial}.(stim).tf;
+                    
+                    eyepos = io.getEyePosition(PDS, thisTrial);
+                    trial(kTrial).eyeSampleTime = eyepos(:,1);
+                    trial(kTrial).eyeXPx        = eyepos(:,2);
+                    trial(kTrial).eyeYPx        = eyepos(:,3);
+                    trial(kTrial).pupilArea     = eyepos(:,4);
+                    
+                    % --- need to add frozen sequence
+                    trial(kTrial).frozenSequence = false;
+                    trial(kTrial).frozenSequenceLength = nan;
+                    
+                    % --- add face targets
+                    if isfield(PDS.data{thisTrial}, 'faceforage')
+                        trial(kTrial).faceforageX = PDS.data{thisTrial}.faceforage.x;
+                        trial(kTrial).faceforageY = PDS.data{thisTrial}.faceforage.y;
+                        trial(kTrial).faceforageCtr = PDS.data{thisTrial}.faceforage.ctrHold;
+                    else
+                        trial(kTrial).faceforageX = nan;
+                        trial(kTrial).faceforageY = nan;
+                        trial(kTrial).faceforageCtr = nan;
+                    end
+                    
+                    
+                end
+                    
+            
+        end
         
         function [trial, display] = importPDS_v1(PDS)
             
