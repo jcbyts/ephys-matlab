@@ -1,12 +1,19 @@
-function sp = runSingleChannelSpikeSortThreshold(ops)
+function thisSession = runSingleChannelSpikeSortThreshold(ops)
+
+if istable(ops)
+    thisSession = ops;
+    ops = io.loadOps(ops);
+else
+    thisSession = [];
+end
 
 info = load(fullfile(ops.root, 'ephys_info.mat'));
 data = io.loadRaw(ops, [], true); % load data in mV
 
-% highpass filter
-%[b,a] = butter(3, 300/30e3*2, 'high');
-
-[b,a] = butter(3, [(300/30e3*2), (6000/30e3*2)]);
+% % highpass filter
+% %[b,a] = butter(3, 300/30e3*2, 'high');
+% bandpass filter between 300 and 6000 Hz
+[b,a] = butter(3, [(300/ops.fs*2), (6000/ops.fs*2)]);
 
 size(data)
 
@@ -114,4 +121,24 @@ sp.firingRates   = zeros(1,n);
 sp.isiV = zeros(1,n);
 
 
-save(fullfile(ops.root, 'sp.mat'), '-v7.3', '-struct', 'sp')
+save(fullfile(ops.root, 'sp-threshold.mat'), '-v7.3', '-struct', 'sp')
+
+if istable(thisSession)
+    newThisSession = thisSession;
+    
+    ssList = thisSession.SpikeSorting{1};
+    if ~isnan(ssList)
+        ssList = regexp(ssList, ',', 'split');
+        ssList = union(ssList, {'threshold'});
+        ssList = sprintf('%s,', ssList{:});
+        newThisSession.SpikeSorting{1} = ssList(1:end-1);
+    else
+        ssList = {'threshold'};
+        ssList = sprintf('%s,', ssList{:});
+        newThisSession.SpikeSorting{1} = ssList(1:end-1);
+    end
+    
+    io.writeMeta(newThisSession, 2)
+    thisSession = newThisSession;
+end
+

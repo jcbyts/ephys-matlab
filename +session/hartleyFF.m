@@ -1,6 +1,6 @@
 classdef hartleyFF < handle
-% Hartley FF (Full Field)
-
+    % Hartley FF (Full Field)
+    
     properties
         numTrials
         trial
@@ -34,7 +34,7 @@ classdef hartleyFF < handle
                 
             end
             
-
+            
             h.numTrials = numel(h.trial);
             
             
@@ -47,8 +47,8 @@ classdef hartleyFF < handle
                 kTrial = randi(h.numTrials);
             end
             
-            plot(h.trial(kTrial).eyeXpx); hold on
-            plot(h.trial(kTrial).eyeYpx);
+            plot(h.trial(kTrial).eyeXPx); hold on
+            plot(h.trial(kTrial).eyeYPx);
             
         end
         
@@ -130,62 +130,62 @@ classdef hartleyFF < handle
             
             fprintf('Done\n')
             fprintf('%02.0f total seconds of stimulus\n', size(h.design.Xd,1)*h.display.ifi)
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             
-%             x=arrayfun(@(x) find(x==kxs), kx(on));
-%             y=arrayfun(@(x) find(x==kys), ky(on));
-%             
-%             ind=sub2ind([numel(kys) numel(kxs)], y, x);
-%             
-%             
-%             fprintf('Building the Design Matrix for %d trials\n', numel(ip.Results.trialIdx))
-%             
-%             t0 = flipTimes(1);
-%             binsize = h.display.ifi;
-%             
-%             temporalBinningFunction = @(t) (t==0) + ceil(t/binsize);
-%             
-%             stimOnset = temporalBinningFunction(flipTimes(on)-t0);
-%             
-%             X = sparse(stimOnset, ind, ones(size(ind,1),1), max(stimOnset), max(ind));
-%             
-%             ntk = ip.Results.nTimeLags;
-%             Xd  = rfmap.makeStimRowsSparse(X, ntk);
-%             h.design.biasCol = size(Xd,2)+1;
-%             
-%             h.design.rowTimes = flipTimes(:);
-%             h.design.binfun   = temporalBinningFunction;
-%             
-%             h.design.Xd  = [Xd ones(size(X,1),1)];
-%             
-%             h.design.XX = h.design.Xd'*h.design.Xd;
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %
+            %             x=arrayfun(@(x) find(x==kxs), kx(on));
+            %             y=arrayfun(@(x) find(x==kys), ky(on));
+            %
+            %             ind=sub2ind([numel(kys) numel(kxs)], y, x);
+            %
+            %
+            %             fprintf('Building the Design Matrix for %d trials\n', numel(ip.Results.trialIdx))
+            %
+            %             t0 = flipTimes(1);
+            %             binsize = h.display.ifi;
+            %
+            %             temporalBinningFunction = @(t) (t==0) + ceil(t/binsize);
+            %
+            %             stimOnset = temporalBinningFunction(flipTimes(on)-t0);
+            %
+            %             X = sparse(stimOnset, ind, ones(size(ind,1),1), max(stimOnset), max(ind));
+            %
+            %             ntk = ip.Results.nTimeLags;
+            %             Xd  = rfmap.makeStimRowsSparse(X, ntk);
+            %             h.design.biasCol = size(Xd,2)+1;
+            %
+            %             h.design.rowTimes = flipTimes(:);
+            %             h.design.binfun   = temporalBinningFunction;
+            %
+            %             h.design.Xd  = [Xd ones(size(X,1),1)];
+            %
+            %             h.design.XX = h.design.Xd'*h.design.Xd;
         end
         
         function sta = spikeTriggeredAverage(h, spikeTimes)
             
-%            bins = (1:size(h.design.Xd))*h.display.ifi + h.design.rowTimes(1);
+            %            bins = (1:size(h.design.Xd))*h.display.ifi + h.design.rowTimes(1);
             bins = h.design.rowTimes;
-           % bin spikes at the frame rate
+            % bin spikes at the frame rate
             y = histc(spikeTimes, bins);
             
-%             figure(1); clf
-%             plot(y)
+            %             figure(1); clf
+            %             plot(y)
             y(diff(bins)>h.display.ifi) = 0;
             
             y = y(:);
@@ -201,7 +201,7 @@ classdef hartleyFF < handle
             u(:,1) = u(:,1) - mean(u(1:5,1));
             [~, im] = max(abs(u(:,1)));
             sflip = sign(u(im,1));
-    
+            
             sta.kxs = h.design.kxs;
             sta.kys = h.design.kys;
             sta.RF = reshape(sflip*v(:,1), h.design.nkx, h.design.nky);
@@ -213,8 +213,8 @@ classdef hartleyFF < handle
         
         function sta = AsdRf(h, spikeTimes)
             
-           bins = (1:size(h.design.Xd))*h.display.ifi + h.design.rowTimes(1);
-           % bin spikes at the frame rate
+            bins = (1:size(h.design.Xd))*h.display.ifi + h.design.rowTimes(1);
+            % bin spikes at the frame rate
             y = histc(spikeTimes, bins);
             
             y = y(:);
@@ -226,7 +226,7 @@ classdef hartleyFF < handle
             u(:,1) = u(:,1) - mean(u(1:5,1));
             [~, im] = max(abs(u(:,1)));
             sflip = sign(u(im,1));
-    
+            
             sta.kxs = h.design.kxs;
             sta.kys = h.design.kys;
             sta.RF = reshape(sflip*v(:,1), h.design.nkx, h.design.nky);
@@ -271,13 +271,13 @@ classdef hartleyFF < handle
                 end
             end
             
-%             for i = frozenTrials(:)'
-%                 
-%                plot(h.trial(i).eyeSampleTime,  [h.trial(i).eyeXPx, h.trial(i).eyeYPx], 'k');
-%             end
+            %             for i = frozenTrials(:)'
+            %
+            %                plot(h.trial(i).eyeSampleTime,  [h.trial(i).eyeXPx, h.trial(i).eyeYPx], 'k');
+            %             end
         end
         
-           
+        
         
     end
     
@@ -302,7 +302,7 @@ classdef hartleyFF < handle
             else
                 [trial, display] = session.hartleyFF.importPDS_v1(PDS);
             end
-                
+            
         end
         
         function [trial, display] = importPDS_v2(PDS)
@@ -310,55 +310,74 @@ classdef hartleyFF < handle
             display = PDS.initialParametersMerged.display;
             
             
-             stim = 'hartley';
+            stim = 'hartley';
             
             trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
+            
+            stimTrials = find(trialIx);
+            
+            % --- check for conditions
+            % if we were using pldaps modular features, it is likely that
+            % some trials do not include the hartley stimulus. Those trials
+            % would've been set by the condition field of pldaps. Check for
+            % the use of conditions and then check if hartley was used.
+            if ~isempty(PDS.conditions)
+                condIx = cellfun(@(x) isfield(x, stim), PDS.conditions(stimTrials));
                 
-                stimTrials = find(trialIx);
+                if any(condIx) % conditions were used (ignore trials that hartley wasn't shown)
+                    
+                    notUsed = cellfun(@(x) x.(stim).use==0, PDS.conditions(stimTrials(condIx)));
+                    
+                    trialList = stimTrials(condIx);
+                    excludeTrials = trialList(notUsed);
+                    
+                    stimTrials = setdiff(stimTrials, excludeTrials);
+                end
+            end
+            
+            if isempty(stimTrials)
+                return;
+            end
+            
+            for j = 1:numel(stimTrials)
+                thisTrial = stimTrials(j);
                 
-                if isempty(stimTrials)
-                    return;
+                kTrial = j;
+                
+                trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
+                trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
+                
+                trial(kTrial).kx         = PDS.data{thisTrial}.(stim).kx;
+                trial(kTrial).ky         = PDS.data{thisTrial}.(stim).ky;
+                trial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
+                trial(kTrial).phi        = PDS.data{thisTrial}.(stim).phi;
+                trial(kTrial).tf         = PDS.data{thisTrial}.(stim).tf;
+                
+                eyepos = io.getEyePosition(PDS, thisTrial);
+                trial(kTrial).eyeSampleTime = eyepos(:,1);
+                trial(kTrial).eyeXPx        = eyepos(:,2);
+                trial(kTrial).eyeYPx        = eyepos(:,3);
+                trial(kTrial).pupilArea     = eyepos(:,4);
+                
+                % --- need to add frozen sequence
+                trial(kTrial).frozenSequence = false;
+                trial(kTrial).frozenSequenceLength = nan;
+                
+                % --- add face targets
+                if isfield(PDS.data{thisTrial}, 'faceforage')
+                    trial(kTrial).faceforageX = PDS.data{thisTrial}.faceforage.x;
+                    trial(kTrial).faceforageY = PDS.data{thisTrial}.faceforage.y;
+                    trial(kTrial).faceforageCtr = PDS.data{thisTrial}.faceforage.ctrHold;
+                else
+                    trial(kTrial).faceforageX = nan;
+                    trial(kTrial).faceforageY = nan;
+                    trial(kTrial).faceforageCtr = nan;
                 end
                 
-                for j = 1:numel(stimTrials)
-                    thisTrial = stimTrials(j);
-                    
-                    kTrial = j;
-                    
-                    trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
-                    trial(kTrial).start      = trial(kTrial).frameTimes(1);
-                    trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
-                   
-                    trial(kTrial).kx         = PDS.data{thisTrial}.(stim).kx;
-                    trial(kTrial).ky         = PDS.data{thisTrial}.(stim).ky;
-                    trial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
-                    trial(kTrial).phi        = PDS.data{thisTrial}.(stim).phi;
-                    trial(kTrial).tf         = PDS.data{thisTrial}.(stim).tf;
-                    
-                    eyepos = io.getEyePosition(PDS, thisTrial);
-                    trial(kTrial).eyeSampleTime = eyepos(:,1);
-                    trial(kTrial).eyeXPx        = eyepos(:,2);
-                    trial(kTrial).eyeYPx        = eyepos(:,3);
-                    trial(kTrial).pupilArea     = eyepos(:,4);
-                    
-                    % --- need to add frozen sequence
-                    trial(kTrial).frozenSequence = false;
-                    trial(kTrial).frozenSequenceLength = nan;
-                    
-                    % --- add face targets
-                    if isfield(PDS.data{thisTrial}, 'faceforage')
-                        trial(kTrial).faceforageX = PDS.data{thisTrial}.faceforage.x;
-                        trial(kTrial).faceforageY = PDS.data{thisTrial}.faceforage.y;
-                        trial(kTrial).faceforageCtr = PDS.data{thisTrial}.faceforage.ctrHold;
-                    else
-                        trial(kTrial).faceforageX = nan;
-                        trial(kTrial).faceforageY = nan;
-                        trial(kTrial).faceforageCtr = nan;
-                    end
-                    
-                    
-                end
-                    
+                
+            end
+            
             
         end
         
@@ -370,32 +389,27 @@ classdef hartleyFF < handle
             stim = 'hartley';
             
             trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
+            
+            stimTrials = find(trialIx);
+            
+            if isempty(stimTrials)
+                return;
+            end
+            
+            for j = 1:numel(stimTrials)
+                thisTrial = stimTrials(j);
                 
-                stimTrials = find(trialIx);
+                kTrial = j;
                 
-                if isempty(stimTrials)
-                    return;
-                end
+                trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
+                trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
                 
-                for j = 1:numel(stimTrials)
-                    thisTrial = stimTrials(j);
-                    
-                    kTrial = j;
-                    
-                    trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
-                    trial(kTrial).start      = trial(kTrial).frameTimes(1);
-                    trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
-                    
-                    if isfield(PDS.conditions{thisTrial}, stim)
-                        if isfield(PDS.conditions{thisTrial}.(stim), 'setupRNG')
-                            if strcmp(PDS.conditions{thisTrial}.(stim).setupRNG, 'frozenSequence')
-                                trial(kTrial).frozenSequence = true;
-                                trial(kTrial).frozenSequenceLength = PDS.conditions{thisTrial}.(stim).sequenceLength;
-                            else
-                                trial(kTrial).frozenSequence = false;
-                                trial(kTrial).frozenSequenceLength = nan;
-                            end
-                            
+                if isfield(PDS.conditions{thisTrial}, stim)
+                    if isfield(PDS.conditions{thisTrial}.(stim), 'setupRNG')
+                        if strcmp(PDS.conditions{thisTrial}.(stim).setupRNG, 'frozenSequence')
+                            trial(kTrial).frozenSequence = true;
+                            trial(kTrial).frozenSequenceLength = PDS.conditions{thisTrial}.(stim).sequenceLength;
                         else
                             trial(kTrial).frozenSequence = false;
                             trial(kTrial).frozenSequenceLength = nan;
@@ -406,18 +420,23 @@ classdef hartleyFF < handle
                         trial(kTrial).frozenSequenceLength = nan;
                     end
                     
-                    trial(kTrial).kx         = PDS.data{thisTrial}.(stim).kx;
-                    trial(kTrial).ky         = PDS.data{thisTrial}.(stim).ky;
-                    trial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
-                    trial(kTrial).phi        = PDS.data{thisTrial}.(stim).phi;
-                    trial(kTrial).tf         = PDS.data{thisTrial}.(stim).tf;
-                    
-                    eyepos = io.getEyePosition(PDS, thisTrial);
-                    trial(kTrial).eyeSampleTime = eyepos(:,1);
-                    trial(kTrial).eyeXPx        = eyepos(:,2);
-                    trial(kTrial).eyeYPx        = eyepos(:,3);
-                    trial(kTrial).pupilArea     = eyepos(:,4);
+                else
+                    trial(kTrial).frozenSequence = false;
+                    trial(kTrial).frozenSequenceLength = nan;
                 end
+                
+                trial(kTrial).kx         = PDS.data{thisTrial}.(stim).kx;
+                trial(kTrial).ky         = PDS.data{thisTrial}.(stim).ky;
+                trial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
+                trial(kTrial).phi        = PDS.data{thisTrial}.(stim).phi;
+                trial(kTrial).tf         = PDS.data{thisTrial}.(stim).tf;
+                
+                eyepos = io.getEyePosition(PDS, thisTrial);
+                trial(kTrial).eyeSampleTime = eyepos(:,1);
+                trial(kTrial).eyeXPx        = eyepos(:,2);
+                trial(kTrial).eyeYPx        = eyepos(:,3);
+                trial(kTrial).pupilArea     = eyepos(:,4);
+            end
             
         end
         

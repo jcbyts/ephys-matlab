@@ -37,7 +37,8 @@ switch name
         
     case 'MTSingleElectrode'
         
-        chanMap = [8 25];
+%         chanMap = [8 25];
+        chanMap = [4 12];
         shank{1} = hardware.electrode.customChannelMap(chanMap);
         shank{1}.name = 'MtBurrHoleMapping';
         
@@ -77,6 +78,18 @@ switch name
         chanMap = [20 23 28];
         shank{1} = hardware.electrode.customChannelMap(chanMap);
         shank{1}.name = 'Single202328';
+        
+    case 'MTsingle052018'
+        
+        chanMap = [4 13];
+        shank{1} = hardware.electrode.customChannelMap(chanMap);
+        shank{1}.name = 'MtBurrHoleMapping';
+        
+    case 'Shank10'
+        
+        shank{1} = hardware.electrode.AtlasE32P1108002;
+        shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
+        shank{1}.name = name;
         
         
 end

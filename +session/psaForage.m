@@ -53,14 +53,33 @@ classdef psaForage < handle
    methods (Static)
        function trial = importPDS(PDS)
            
-           pdsDate = PDS.initialParametersMerged.session.initTime;
+           % importPDS checks which version of to stimulus code was run
+            % and imports to a common format appropriately
+            
+            pdsDate = PDS.initialParametersMerged.session.initTime;
+            if isfield(PDS.initialParametersMerged.git, 'pep')
+                
+                if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
+                    
+                    if pdsDate > datenum(2018, 05, 20)
+                        trial = session.psaForage.importPDS_v2(PDS);
+                    elseif pdsDate > datenum(2018, 02, 01)
+                        trial = session.psaForage.importPDS_v1(PDS);
+                    else
+                        error('unknown version')
+                    end
+                    
+                else
+                    error('unknown version')
+                end
+            else
+                error('unknown version')
+            end
            
-           if pdsDate > datenum(2018,05,14)
-               trial = [];
-           else
-               trial = session.psaForage.importPDS_v1(PDS);
-           end
-           
+       end
+       
+       function psaTrial = importPDS_v2(PDS)
+          error('not implemented yet')
        end
        
        function psaTrial = importPDS_v1(PDS)

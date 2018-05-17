@@ -97,18 +97,33 @@ classdef squareFlash < handle
             ip.parse(varargin{:})
             
             
-            flipTimes = cell2mat(arrayfun(@(x) x.frameTimes, h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
+            flipTimes = cell2mat(arrayfun(@(x) x.frameTimes(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
             
             ppd = h.display.ppd;
             
             win = ip.Results.window*ppd;
+            if numel(win) == 4
+                winx = win([1 3]);
+                winy = win([2 4]);
+            else
+                winx = win;
+                winy = win;
+            end
             
             binSize = ip.Results.binSize*ppd;
-            binx = @(x) (x==0) + ceil(x/binSize);
-            biny = @(x) ceil(x/binSize);
+            
+            % spatial coordinates (in pixels)
+            xax = winx(1):binSize:winx(2);
+            yax = winy(1):binSize:winy(2);
+            [xx,yy] = meshgrid(xax, yax);
+            
+%             binx = @(x) (x==0) + ceil(x/binSize);
+%             biny = @(x) ceil(x/binSize);
             
             % --- find total stimulus space
-            sz = [biny(diff(win)) binx(diff(win))];
+%             sz = [biny(diff(winy)) binx(diff(winx))];
+            
+            sz = size(xx);
             nTotalFrames = sum(arrayfun(@(x) numel(x.frameTimes), h.trial));
             
             
@@ -116,7 +131,7 @@ classdef squareFlash < handle
             h.design.nkTime   = ip.Results.nTimeLags;
             
             
-            iFrame = 0;
+            frameCounter = 0;
             
             X = zeros(nTotalFrames, prod(sz));
             
@@ -124,54 +139,121 @@ classdef squareFlash < handle
             nTrials = numel(h.trial);
             for kTrial = 1:nTrials
                 fprintf('%d / %d \n', kTrial, nTrials)
-                frameIdx = iFrame + (1:numel(h.trial(kTrial).frameTimes));
+                frameIdx = frameCounter + (1:numel(h.trial(kTrial).frameTimes));
                 
                 nFrames = numel(frameIdx);
                 
                 xtmp = zeros(nFrames, prod(sz));
                 
-                x = squeeze(mean(h.trial(kTrial).pos([1 3],:,:)))';
-                y = squeeze(mean(h.trial(kTrial).pos([2 4],:,:)))';
+%                 x = squeeze(mean(h.trial(kTrial).pos([1 3],:,:)))';
+%                 y = squeeze(mean(h.trial(kTrial).pos([2 4],:,:)))';
                 
+                % get upper left corner of the squares
+                xUL = squeeze(h.trial(kTrial).pos(1,:,:))';
+                yUL = squeeze(h.trial(kTrial).pos(2,:,:))';
+                % lower right corner
+                xLR = squeeze(h.trial(kTrial).pos(3,:,:))';
+                yLR = squeeze(h.trial(kTrial).pos(4,:,:))';
+                
+                % eye position at frame flip (in pixels)
                 eyeX = h.trial(kTrial).eyePosAtFrame(:,1);
                 eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
                 
-                x_ = bsxfun(@minus, x, eyeX);
-                y_ = bsxfun(@minus, y, eyeY);
+                if ip.Results.correctEyePos
+%                     x_ = bsxfun(@minus, x, eyeX);
+%                     y_ = bsxfun(@minus, y, eyeY);
+                    
+                    xUL_ = bsxfun(@minus, xUL, eyeX);
+                    yUL_ = bsxfun(@minus, yUL, eyeY);
+                    xLR_ = bsxfun(@minus, xLR, eyeX);
+                    yLR_ = bsxfun(@minus, yLR, eyeY);
+                else
+%                     x_ = x - h.display.ctr(1);
+%                     y_ = y - h.display.ctr(2);
+
+                    xUL_ = xUL - h.display.ctr(1);
+                    yUL_ = yUL - h.display.ctr(2);
+                    xLR_ = xLR - h.display.ctr(1);
+                    yLR_ = yLR - h.display.ctr(2);
+                end
                 
                 % flip y, because pixels count from top left to bottom
                 % right
-                y_ = -y_;
-                off = (x_ < win(1) | x_ > win(2)) | (y_ < win(1) | y_ > win(2));
-                x_(off) = nan;
-                y_(off) = nan;
+%                 y_ = -y_;
+                yUL_ = -yUL_;
+                yLR_ = -yLR_;
                 
-                figure(1); clf
-                xbin = biny(x_ - win(1));
-                ybin = biny(y_ - win(1));
+%                 figure(1); clf
+%                 plot(xx(:), yy(:), '.k'); hold on
+%                 for iSquare = 1:size(xUL_,2)
+%                     for iFrame = 1:size(xUL_,1)
+%                         plot([xUL_(iFrame,iSquare) xLR_(iFrame,iSquare)], [yUL_(iFrame,iSquare) yLR_(iFrame,iSquare)], '-'); hold on
+%                     end
+%                 end
+%                 
+% %                 figure(2); clf
+%                 tmp2 = zeros(size(xx));
+%                 for iSquare = 1:size(xUL_,2)
+%                     for iFrame = 1:size(xUL_,1)
+%                         tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
+%                             & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
+%                             
+% %                          tmp =    (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
+%                         tmp2 = tmp2 + tmp;
+%                 
+%                     end
+%                 end
+%                 imagesc(tmp2)
+%                 drawnow
                 
-                for k = 1:size(xbin,2)
-                    stimOn = find(~(isnan(xbin(:,k)) | isnan(ybin(:,k))));
-                    
-                    xyind = sub2ind(sz, ybin(stimOn,k), xbin(stimOn,k));
-                    
-                    ind = sub2ind([nFrames, prod(sz)], stimOn, xyind);
-                    
-                    xtmp(ind) = xtmp(ind) + 1;
-                    
+%                 
+                
+                for iSquare = 1:size(xUL_,2)
+                    for iFrame = 1:size(xUL_,1)
+                        tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
+                            & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
+                        xtmp(iFrame,:) = xtmp(iFrame,:) + tmp(:)';
+                    end
                 end
+%                 
+                figure(1); clf
+                subplot(1,2,1)
+                imagesc(reshape(sum(xtmp), sz))
+                subplot(1,2,2)
+                imagesc(xtmp)
+                drawnow
+                
+%                 % ignore values that are outside the window
+%                 off = (x_ < winx(1) | x_ > winx(2)) | (y_ < winy(1) | y_ > winy(2));
+%                 x_(off) = nan;
+%                 y_(off) = nan;
+%                 
+%                 figure(1); clf
+%                 xbin = binx(x_ - winx(1));
+%                 ybin = biny(y_ - winy(1));
+%                 
+%                 for k = 1:size(xbin,2)
+%                     stimOn = find(~(isnan(xbin(:,k)) | isnan(ybin(:,k))));
+%                     
+%                     xyind = sub2ind(sz, ybin(stimOn,k), xbin(stimOn,k));
+%                     
+%                     ind = sub2ind([nFrames, prod(sz)], stimOn, xyind);
+%                     
+%                     xtmp(ind) = xtmp(ind) + 1;
+%                     
+%                 end
                 
                 X(frameIdx,:) = xtmp;
                 
-                iFrame = iFrame + nFrames;
+                frameCounter = frameCounter + nFrames;
                 
             end
             
             S.X    = X;
             S.bins = flipTimes(:);
             S.size = sz;
-            S.xax  = (1:sz(2)) * binSize / ppd + ip.Results.window(1);
-            S.yax  = (1:sz(1)) * binSize / ppd + ip.Results.window(1);
+            S.xax  = (1:sz(2)) * binSize / ppd + winx(1)/ppd;
+            S.yax  = (1:sz(1)) * binSize / ppd + winy(1)/ppd;
             
             %             tic
             %             fprintf('Unwrapping convolution for STA, regression... \t')
@@ -661,6 +743,8 @@ classdef squareFlash < handle
     methods (Static)
         
         function [trial, display] = importPDS(PDS)
+            % importPDS checks which version of to stimulus code was run
+            % and imports to a common format appropriately
             
             pdsDate = PDS.initialParametersMerged.session.initTime;
             if isfield(PDS.initialParametersMerged.git, 'pep')
@@ -693,6 +777,25 @@ classdef squareFlash < handle
             
             stimTrials = find(trialIx);
             
+            % --- check for conditions
+            % if we were using pldaps modular features, it is likely that
+            % some trials do not include the hartley stimulus. Those trials
+            % would've been set by the condition field of pldaps. Check for
+            % the use of conditions and then check if hartley was used.
+            if ~isempty(PDS.conditions)
+                condIx = cellfun(@(x) isfield(x, stim), PDS.conditions(stimTrials));
+                
+                if any(condIx) % conditions were used (ignore trials that hartley wasn't shown)
+                    
+                    notUsed = cellfun(@(x) x.(stim).use==0, PDS.conditions(stimTrials(condIx)));
+                    
+                    trialList = stimTrials(condIx);
+                    excludeTrials = trialList(notUsed);
+                    
+                    stimTrials = setdiff(stimTrials, excludeTrials);
+                end
+            end
+            
             if isempty(stimTrials)
                 return;
             end
@@ -702,13 +805,16 @@ classdef squareFlash < handle
                 
                 kTrial = j;
                 
-                trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
+                trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end)); %#ok<*AGROW>
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
-                trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
+                trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end)) - trial(kTrial).start;
                 
                 trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
-                
+                if size(trial(kTrial).pos, 3) ~= numel(trial(kTrial).frameTimes)
+                    keyboard
+                end
                 eyepos = io.getEyePosition(PDS, thisTrial);
+                
                 trial(kTrial).eyeSampleTime = eyepos(:,1);
                 trial(kTrial).eyeXPx        = eyepos(:,2);
                 trial(kTrial).eyeYPx        = eyepos(:,3);
@@ -727,10 +833,10 @@ classdef squareFlash < handle
                 trial(kTrial).eyeYPx(bad) = nan;
                 trial(kTrial).pupilArea(bad) = nan;
                 
-                % find eye position on each frame
-                t = trial(kTrial).frameTimes - trial(kTrial).start;
-                tdiff = abs(bsxfun(@minus, trial(kTrial).eyeSampleTime, t(:)')) < mean(diff(trial(kTrial).eyeSampleTime));
-                [irow,~] = find(diff(tdiff)==-1);
+%                 % find eye position on each frame
+%                 t = trial(kTrial).frameTimes - trial(kTrial).start;
+%                 tdiff = abs(bsxfun(@minus, trial(kTrial).eyeSampleTime, t(:)')) < mean(diff(trial(kTrial).eyeSampleTime));
+%                 [irow,~] = find(diff(tdiff)==-1);
                 
                 %                     trial(kTrial).saccades = false(size(trial(kTrial).frameTimes));
                 %
@@ -739,7 +845,13 @@ classdef squareFlash < handle
                 %                         trial(kTrial).saccades(ix) = true;
                 %                     end
                 
-                trial(kTrial).eyePosAtFrame = [trial(kTrial).eyeXPx(irow) trial(kTrial).eyeYPx(irow)];
+                trial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame';
+                
+                iix = trial(kTrial).eyePosAtFrame(:,1) < 200 | trial(kTrial).eyePosAtFrame(:,1) > 1800;
+                iiy = trial(kTrial).eyePosAtFrame(:,2) < 100 | trial(kTrial).eyePosAtFrame(:,2) > 1000;
+                bad = iix | iiy;
+                
+                trial(kTrial).eyePosAtFrame(bad,:) = nan;
                 
             end
             

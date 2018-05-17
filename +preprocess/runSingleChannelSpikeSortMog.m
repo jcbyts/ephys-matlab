@@ -1,5 +1,12 @@
 function sp = runSingleChannelSpikeSortMog(ops)
 
+if istable(ops)
+    thisSession = ops;
+    ops = io.loadOps(ops);
+else
+    thisSession = [];
+end
+
 info = load(fullfile(ops.root, 'ephys_info.mat'));
 data = io.loadRaw(ops, [], true); % load data in mV
 
@@ -99,4 +106,24 @@ sp.firingRates   = zeros(1,n);
 sp.isiV = zeros(1,n);
 
 
-save(fullfile(ops.root, 'sp.mat'), '-v7.3', '-struct', 'sp')
+save(fullfile(ops.root, 'spMog.mat'), '-v7.3', '-struct', 'sp')
+
+
+if istable(thisSession)
+    newThisSession = thisSession;
+    
+    ssList = thisSession.SpikeSorting{1};
+    if ~isnan(ssList)
+        ssList = regexp(ssList, ',', 'split');
+        ssList = union(ssList, {'MOG'});
+        ssList = sprintf('%s,', ssList{:});
+        newThisSession.SpikeSorting{1} = ssList(1:end-1);
+    else
+        ssList = {'MOG'};
+        ssList = sprintf('%s,', ssList{:});
+        newThisSession.SpikeSorting{1} = ssList(1:end-1);
+    end
+    
+    io.writeMeta(newThisSession, 2)
+    
+end

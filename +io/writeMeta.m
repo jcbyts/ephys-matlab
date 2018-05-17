@@ -39,16 +39,20 @@ for iSession = 1:nNew
                     
                     case 'cell'
                         
-                        if ~all(old_.(fields{iVar}){1} == new_.(fields{iVar}){1})
-                            mismatch(iVar) = true;
-                        end
-                        
-                        if mismatch(iVar) % if mismatch flagged, check for nans
-                            if (numel(old_.(fields{iVar}){1})==1) && isnan(old_.(fields{iVar}){1}) && (numel(new_.(fields{iVar}){1})==1) && isnan(new_.(fields{iVar}){1})
-                                mismatch(iVar) = false;
+                        if iscell(new_.(fields{iVar}))
+                            
+                            if (numel(old_.(fields{iVar}){1}) ~= numel(new_.(fields{iVar}){1})) || ~all(old_.(fields{iVar}){1} == new_.(fields{iVar}){1})
+                                mismatch(iVar) = true;
                             end
+                            
+                            if mismatch(iVar) % if mismatch flagged, check for nans
+                                if (numel(old_.(fields{iVar}){1})==1) && isnan(old_.(fields{iVar}){1}) && (numel(new_.(fields{iVar}){1})==1) && isnan(new_.(fields{iVar}){1})
+                                    mismatch(iVar) = false;
+                                end
+                            end
+                        else
+                            new_.(fields{iVar}) = {new_.(fields{iVar})};
                         end
-                        
                     case 'double'
                         
                         if ~all(old_.(fields{iVar}) == new_.(fields{iVar}))

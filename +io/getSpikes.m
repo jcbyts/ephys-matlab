@@ -12,6 +12,10 @@ if nargin < 2
     tag = 'Kilo';
 end
 
+if istable(sess)
+    sess = io.loadSession(sess);
+end
+
 ephys_dirs = dir(fullfile(sess.path, '_shank*'));
 nDirs = numel(ephys_dirs);
 

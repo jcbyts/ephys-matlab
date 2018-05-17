@@ -1,6 +1,6 @@
 function newThisSession = importStimulusProtocols(thisSession)
 
-newThisSession = thisSession;
+
 
 % --- import the stimulus
 disp('Loading PDS files')
@@ -19,6 +19,11 @@ for kStim = 1:nProt
         hasStim(kStim) = true;
     end
 end
+if ~iscell(thisSession.StimulusProtocols)
+    thisSession.StimulusProtocols = {thisSession.StimulusProtocols};
+end
+
+newThisSession = thisSession;
 
 stimList = thisSession.StimulusProtocols{1};
 if ~isnan(stimList)
@@ -31,3 +36,5 @@ else
     stimList = sprintf('%s,', stimList{:});
     newThisSession.StimulusProtocols{1} = stimList(1:end-1);
 end
+
+io.writeMeta(newThisSession, 2)
