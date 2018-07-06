@@ -12,6 +12,9 @@ if nargin == 0
         'Shank4', ...
         'Shank5', ...
         'Single202328', ...
+        'AtlasE32P1108002', ...
+        'Shank10', ...
+        'MTsingleCh25'
         };
     
     name = io.selectFromList(shankList);
@@ -85,11 +88,18 @@ switch name
         shank{1} = hardware.electrode.customChannelMap(chanMap);
         shank{1}.name = 'MtBurrHoleMapping';
         
-    case 'Shank10'
+	case 'MTsingleCh25'
+        
+        chanMap = 25;
+        shank{1} = hardware.electrode.customChannelMap(chanMap);
+        shank{1}.name = 'TungstenCapDrive';
+        
+    case {'Shank10', 'AtlasE32P1108002'}
         
         shank{1} = hardware.electrode.AtlasE32P1108002;
         shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
         shank{1}.name = name;
+        
         
         
 end

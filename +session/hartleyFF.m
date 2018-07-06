@@ -61,9 +61,9 @@ classdef hartleyFF < handle
             ip.parse(varargin{:})
             
             
-            flipTimes = cell2mat(arrayfun(@(x) x.frameTimes, h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
-            kx        = cell2mat(arrayfun(@(x) x.kx', h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
-            ky        = cell2mat(arrayfun(@(x) x.ky', h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
+            flipTimes = cell2mat(arrayfun(@(x) x.frameTimes(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
+            kx        = cell2mat(arrayfun(@(x) x.kx(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
+            ky        = cell2mat(arrayfun(@(x) x.ky(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
             on        = ~(isnan(kx) | isnan(ky));
             
             % --- find total stimulus space
@@ -96,7 +96,7 @@ classdef hartleyFF < handle
                 
                 xtmp = zeros(nFrames, prod(sz));
                 
-                stimOn = find(h.trial(kTrial).on);
+                stimOn = find(h.trial(kTrial).on(1:nFrames));
                 [kxj, ~] = find( bsxfun(@eq, h.trial(kTrial).kx(stimOn), h.design.kxs(:)')');
                 tmp = bsxfun(@eq, h.trial(kTrial).ky(stimOn), h.design.kys(:)');
                 [kyj, ~] = find( tmp' );

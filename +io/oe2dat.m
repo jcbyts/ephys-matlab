@@ -202,6 +202,11 @@ for k = 1:nBlocks
             ns_ = numel(seg)*SAMPLES_PER_RECORD;
             stops = find(diff(seg)~=SAMPLES_PER_RECORD)+1;
             
+            % ignore interruptions that occured on the last sample. This is
+            % rare and appears to cause aligment problems with tracking
+            % timestamps. It will create a fragment that is length = 0.
+            stops(numel(seg)==stops) = []; % interruption on the last sample
+            
             if any(stops)
                 ts_ = [ts_ seg(stops)'];
                 ns_ = diff([0 stops(:)' numel(seg)])*SAMPLES_PER_RECORD;

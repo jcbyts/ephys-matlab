@@ -61,7 +61,7 @@ classdef psaForage < handle
                 
                 if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
                     
-                    if pdsDate > datenum(2018, 05, 20)
+                    if pdsDate > datenum(2018, 06, 30)
                         trial = session.psaForage.importPDS_v2(PDS);
                     elseif pdsDate > datenum(2018, 02, 01)
                         trial = session.psaForage.importPDS_v1(PDS);
@@ -73,7 +73,11 @@ classdef psaForage < handle
                     error('unknown version')
                 end
             else
-                error('unknown version')
+                try
+                     trial = session.psaForage.importPDS_v1(PDS);
+                catch me
+                    error('unknown version')
+                end
             end
            
        end
@@ -129,8 +133,11 @@ classdef psaForage < handle
                psaTrial(kTrial).targsOff = nan(psaTrial(kTrial).numTargs, nt);
                
                for iTarg = 1:psaTrial(kTrial).numTargs
+                   if isempty(psaTrial(kTrial).targets(iTarg).log) % target never turned on
+                       continue
+                   end
                    nt = size(psaTrial(kTrial).targets(iTarg).log,2);
-                   ix = psaTrial(kTrial).targets(1).log(1,:) == 1; 
+                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 1; 
                    if ~any(ix) % target never turned on
                        continue
                    end

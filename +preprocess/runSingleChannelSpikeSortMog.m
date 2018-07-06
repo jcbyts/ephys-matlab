@@ -106,7 +106,7 @@ sp.firingRates   = zeros(1,n);
 sp.isiV = zeros(1,n);
 
 
-save(fullfile(ops.root, 'spMog.mat'), '-v7.3', '-struct', 'sp')
+save(fullfile(ops.root, 'sp-MOG.mat'), '-v7.3', '-struct', 'sp')
 
 
 if istable(thisSession)

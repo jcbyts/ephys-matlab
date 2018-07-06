@@ -32,7 +32,7 @@ for iSession = 1:nSessions
         continue
     end
     
-    stimulusProtocols = {'hartleyFF', 'csdFlash', 'natImgBackground', 'squareFlash', };
+    stimulusProtocols = {'hartleyFF', 'csdFlash', 'natImgBackground', 'squareFlash', 'psaForage'};
     nProt = numel(stimulusProtocols);
     hasStim = false(nProt,1);
     for kStim = 1:nProt

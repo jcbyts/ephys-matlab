@@ -1,4 +1,4 @@
-function PDS = getPds(sessionInfo, overwrite)
+function PDS = getPds(sessionInfo, overwrite, includeBadSyncs)
 % GET PDS loads PLDAPS files and synchronizes with the OE clock
 % Inputs:
 %   SessionInfo@struct - session info struct from io.loadSession(oepath)
@@ -9,8 +9,11 @@ function PDS = getPds(sessionInfo, overwrite)
 
 % 2017.08.14    jly     wrote it
 
-if nargin < 2
-    overwrite = false;
+if nargin < 3
+    includeBadSyncs = false;
+    if nargin < 2
+        overwrite = false;
+    end
 end
 
 if isa(sessionInfo, 'table') % it's meta data -- load the struct
@@ -47,7 +50,7 @@ for kPdsFile = 1:nPdsFiles
     % check that you have the proper PLDAPS and PEP branches currently in
     % the path to ensure that all objects are recreated properly
     
-    % I hate regexp! why!?
+    % I hate regexp! why is it so confusing!?
     branch = regexp(tmp.PDS.initialParametersMerged.git.pep.status, '(?<=branch\s)(\w+)', 'match');
     data_branch = branch{1};
     [pep_path, ~] = fileparts(which('calibrationGUI.m'));
@@ -87,10 +90,17 @@ for kPdsFile = 1:nPdsFiles
     PDS{kPdsFile} = tmp.PDS;
 end
 
-badSync = reconError > .1;
-noEphys = cellfun(@(x) isempty(x.maxreconstructionerror), PDS);
 
-PDS(noEphys | badSync) = [];
+badSync = reconError > .1;
+if any(badSync)
+    keyboard
+end
+noEphys = cellfun(@(x) isempty(x.maxreconstructionerror), PDS);
+if includeBadSyncs
+    PDS(noEphys) = [];
+else
+    PDS(noEphys | badSync) = [];
+end
 
 dt = cellfun(@(x) x.initialParametersMerged.session.initTime, PDS);
 [~, id] = sort(dt);

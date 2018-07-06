@@ -28,7 +28,7 @@ classdef natImgBackground < handle
                 
                 trial_ = obj.importPDS(PDS{i});
                 
-                if isempty(trial_)
+                if isempty(trial_) || isempty(fieldnames(trial_))
                     continue
                 end
                 
