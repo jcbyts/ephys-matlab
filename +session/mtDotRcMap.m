@@ -18,14 +18,14 @@ classdef mtDotRcMap < handle
             
             stim = 'DotMapping';
             
-            ppd  = PDS{1}.initialParametersMerged.display.ppd;
-            ifi  = PDS{1}.initialParametersMerged.display.ifi;
-            
             
             hasStim = io.findPDScontainingStimModule(PDS, stim);
             if ~any(hasStim)
                 return
             end
+
+            ppd  = PDS{1}.initialParametersMerged.display.ppd;
+            ifi  = PDS{1}.initialParametersMerged.display.ifi;
             
             m.display = PDS{find(hasStim,1)}.initialParametersMerged.display;
             

@@ -8,6 +8,8 @@
 % can then update.
 io.importSession();
 
+io.importSession([], 'overwrite', true);
+
 %% load the session from the meta table
 
 meta = io.getExperimentsAnd(); % get all experiments meta data
@@ -29,6 +31,7 @@ preprocess.runSingleChannelSpikeSortThreshold(thisSession)
 preprocess.runSingleChannelSpikeSortMog(thisSession)
 
 %% refresh session
+% rerun getExperimentsAnd to refresh the meta data
 meta = io.getExperimentsAnd(); % get all experiments meta data
 
 thisSession = meta(end,:);

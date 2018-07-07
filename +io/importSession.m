@@ -1,4 +1,4 @@
-function thisSession = importSession(thisSession)
+function thisSession = importSession(thisSession, varargin)
 % this is a bottom up import of a session. Some things may already have
 % been run. 
 % call by passing in an existing session meta data or by starting from
@@ -11,11 +11,13 @@ function thisSession = importSession(thisSession)
 % 
 % or 
 % io.importSession(); % no arguments lets you select things
-
+ip = inputParser();
+ip.addParameter('overwrite', false);
+ip.parse(varargin{:});
 
 SERVER_DATA_DIR = getpref('EPHYS', 'SERVER_DATA');
 
-if nargin == 0 % no session passed in
+if ~exist('thisSession', 'var') || isempty(thisSession) % no session passed in
     fprintf('No session passed in. Use the GUI to select a folder to import\n')
     % use gui to select session
     directoryname = uigetdir(SERVER_DATA_DIR, 'Pick session to import');
@@ -115,7 +117,7 @@ thisSession.oe2dat = true;
 sess = io.loadSession(oepath);
 
 % important!! make sure you are on the right version of the stimulus code
-overwrite = false; % if it breaks, run again with true
+overwrite = ip.Results.overwrite; % if it breaks, run again with true
 PDS = io.getPds(sess, overwrite);
 
 if isempty(PDS)
