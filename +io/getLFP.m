@@ -248,6 +248,7 @@ newInfo = info;
 newInfo.sampleRate = NEW_FS;
 newInfo.fragments  = info.fragments(:)/downStep;
 newInfo.phaseCorrection = OE_HIGHPASS;
+newInfo.artifacts = find(bad);
 info = newInfo;
 
 fprintf('Saving meta data...\t')

@@ -31,7 +31,7 @@ data = flipud(data);
 sp = struct('ss', [], 'clu', []);
 nChannels = size(data,2);
 Fs = info.sampleRate; % sampling rate
-threshhold = -4; % in SD
+threshhold = -3.5; % in SD
 clustOffset = 0;
 for iCh = 1:nChannels
     

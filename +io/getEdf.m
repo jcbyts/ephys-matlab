@@ -20,6 +20,10 @@ if nargin < 3
     overwrite = false;
 end
 
+if isa(sess, 'table') % it's meta data -- load the struct
+    sess = io.loadSession(sess);
+end
+
 elInfo.timestamps = [];
 elInfo.fragments  = [];
 elInfo.sampleRate = [];

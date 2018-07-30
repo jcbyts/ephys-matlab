@@ -2,11 +2,14 @@
 % This script shows how to import a session from pldaps using the full
 % pipeline.
 
+% Run this first-> 
+addEphysMatlab
+
 % run import session to start the process. It will have you select a
 % folder, and will import the raw ephys, apply the channel map, and filter
 % the LFP. Finally, it will add the session to the meta table, which you
 % can then update.
-io.importSession();
+%io.importSession();
 
 io.importSession([], 'overwrite', true);
 
@@ -14,7 +17,8 @@ io.importSession([], 'overwrite', true);
 
 meta = io.getExperimentsAnd(); % get all experiments meta data
 
-thisSession = meta(end,:);
+%thisSession = meta(146,:); % choose the exact session you want to look at from the meta table 
+thisSession = meta(end,:); % if you just want the last one
 disp(thisSession)
 
 %% Import the stimuli
@@ -34,6 +38,7 @@ preprocess.runSingleChannelSpikeSortMog(thisSession)
 % rerun getExperimentsAnd to refresh the meta data
 meta = io.getExperimentsAnd(); % get all experiments meta data
 
+%thisSession = meta(148,:); % again grab the session you are working with
 thisSession = meta(end,:);
 disp(thisSession)
 
@@ -46,10 +51,14 @@ spatialMap = session.squareFlash(PDS);
 
 %% bin space and create the design matrix
 %x,y,x,y
-window = [0 -10 10 10]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
+
+% window = [-5 -5 5 5]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
+% binSize = 0.5; % degrees
+
+window  = [0 -5 5 0]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
 binSize = 1; % degrees
 
-stim = spatialMap.binSpace('window', window, 'binSize', binSize, 'correctEyePos', true);
+stim = spatialMap.binSpaceFrameLoop('window', window, 'binSize', binSize, 'correctEyePos', true);
 
 nTimeBins = 20; % frames
 Xd = spatialMap.buildDesignMatrix(stim, nTimeBins);

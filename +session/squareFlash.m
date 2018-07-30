@@ -62,8 +62,7 @@ classdef squareFlash < handle
             
         end
         
-        
-        function S = binSpace(h, varargin)
+        function S = binSpaceFrameLoop(h, varargin)
             % binSpace bins the stimulus at a specified resolution
             % Inputs (as argument pairs)
             %   'trialIdx'        - range of trials (default: 1:numTrials)
@@ -94,17 +93,17 @@ classdef squareFlash < handle
             ip.addParameter('correctEyePos', true)
             ip.addParameter('window', [-5 5])
             ip.addParameter('binSize', 1)
+            ip.addParameter('plot', false)
             ip.parse(varargin{:})
             
-            
-            flipTimes = cell2mat(arrayfun(@(x) x.frameTimes(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
-            
+
             ppd = h.display.ppd;
             
+            % conver window into pixel units
             win = ip.Results.window*ppd;
             if numel(win) == 4
-                winx = win([1 3]);
-                winy = win([2 4]);
+                winx = sort(win([1 3]));
+                winy = sort(win([2 4]));
             else
                 winx = win;
                 winy = win;
@@ -116,12 +115,6 @@ classdef squareFlash < handle
             xax = winx(1):binSize:winx(2);
             yax = winy(1):binSize:winy(2);
             [xx,yy] = meshgrid(xax, yax);
-            
-%             binx = @(x) (x==0) + ceil(x/binSize);
-%             biny = @(x) ceil(x/binSize);
-            
-            % --- find total stimulus space
-%             sz = [biny(diff(winy)) binx(diff(winx))];
             
             sz = size(xx);
             nTotalFrames = sum(arrayfun(@(x) numel(x.frameTimes), h.trial));
@@ -138,15 +131,26 @@ classdef squareFlash < handle
             
             nTrials = numel(h.trial);
             for kTrial = 1:nTrials
+                
+                
                 fprintf('%d / %d \n', kTrial, nTrials)
                 frameIdx = frameCounter + (1:numel(h.trial(kTrial).frameTimes));
                 
                 nFrames = numel(frameIdx);
                 
-                xtmp = zeros(nFrames, prod(sz));
+                iFrame = 1;
+                eyeXY = h.trial(kTrial).eyePosAtFrame(iFrame,:);
+                % get upper left corner of the squares
+                xUL = squeeze(h.trial(kTrial).pos(1,:,iFrame))';
+                yUL = squeeze(h.trial(kTrial).pos(2,:,iFrame))';
+                % lower right corner
+                xLR = squeeze(h.trial(kTrial).pos(3,:,iFrame))';
+                yLR = squeeze(h.trial(kTrial).pos(4,:,iFrame))';
+                figure(1); clf
+                plot(xUL, yUL, '.')
                 
-%                 x = squeeze(mean(h.trial(kTrial).pos([1 3],:,:)))';
-%                 y = squeeze(mean(h.trial(kTrial).pos([2 4],:,:)))';
+                
+                xtmp = zeros(nFrames, prod(sz));
                 
                 % get upper left corner of the squares
                 xUL = squeeze(h.trial(kTrial).pos(1,:,:))';
@@ -168,9 +172,6 @@ classdef squareFlash < handle
                     xLR_ = bsxfun(@minus, xLR, eyeX);
                     yLR_ = bsxfun(@minus, yLR, eyeY);
                 else
-%                     x_ = x - h.display.ctr(1);
-%                     y_ = y - h.display.ctr(2);
-
                     xUL_ = xUL - h.display.ctr(1);
                     yUL_ = yUL - h.display.ctr(2);
                     xLR_ = xLR - h.display.ctr(1);
@@ -255,26 +256,192 @@ classdef squareFlash < handle
             S.xax  = (1:sz(2)) * binSize / ppd + winx(1)/ppd;
             S.yax  = (1:sz(1)) * binSize / ppd + winy(1)/ppd;
             
-            %             tic
-            %             fprintf('Unwrapping convolution for STA, regression... \t')
-            %             Xd  = rfmap.makeStimRowsDense(X, h.design.nkTime);
-            %             fprintf('[%02.0fs]\n', toc)
+        end
+        
+        function S = binSpace(h, varargin)
+            % binSpace bins the stimulus at a specified resolution
+            % Inputs (as argument pairs)
+            %   'trialIdx'        - range of trials (default: 1:numTrials)
+            %   'correctEyePos'   - retinal or screen coords (default: true)
+            %   'window'  [1 x 2] - bounds of the window to analyze (degrees)
+            %   'binSize' [1 x 1] - size of each bin (degrees)
+            % Output
+            %   S@struct
+            %       X [time x bins] - stimulus binned in space. Each row is
+            %                         the stimulus frame reshaped to be a
+            %                         single vector of size diff(window)/binSize
+            %       bins [time x 1] - the time of each row of X
+            %       xax  [1 x bins] - x axis (in degrees)
+            %       yax  [1 x bins] - y axis (in degrees)
+            %       size [1 x 2]    - size of spatial stimulus
             %
-            %             h.design.biasCol = size(Xd,2)+1;
+            % Example Call:
+            % S = obj.binSpace('correctEyePos', true, 'window', [-2 2], ...
+            %       'binSize', 1);
             %
-            %             h.design.rowTimes = flipTimes(:);
-            %
-            %             h.design.Xd  = [Xd ones(size(X,1),1)];
-            %
-            %             % sample covariance matrix (for regression)
-            %             h.design.XX = h.design.Xd'*h.design.Xd;
-            %
-            %             fprintf('Done\n')
-            %             fprintf('%02.0f total seconds of stimulus\n', size(h.design.Xd,1)*h.display.ifi)
+            % % plot a frame
+            %   imagesc(S.xax, S.yax, reshape(X(1,:), S.sz));
+            
+            
+            ip = inputParser();
+            ip.addParameter('trialIdx', 1:h.numTrials)
+            ip.addParameter('nTimeLags', 30)
+            ip.addParameter('correctEyePos', true)
+            ip.addParameter('window', [-5 5])
+            ip.addParameter('binSize', 1)
+            ip.addParameter('plot', false)
+            ip.parse(varargin{:})
+            
+            
+            flipTimes = cell2mat(arrayfun(@(x) x.frameTimes(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
+            
+            ppd = h.display.ppd;
+            
+            win = ip.Results.window*ppd;
+            if numel(win) == 4
+                winx = win([1 3]);
+                winy = win([2 4]);
+            else
+                winx = win;
+                winy = win;
+            end
+            
+            binSize = ip.Results.binSize*ppd;
+            
+            % spatial coordinates (in pixels)
+            xax = winx(1):binSize:winx(2);
+            yax = winy(1):binSize:winy(2);
+            [xx,yy] = meshgrid(xax, yax);
+            
+            sz = size(xx);
+            nTotalFrames = sum(arrayfun(@(x) numel(x.frameTimes), h.trial));
+            
+            
+            h.design.trialIdx = ip.Results.trialIdx;
+            h.design.nkTime   = ip.Results.nTimeLags;
+            
+            
+            frameCounter = 0;
+            
+            X = zeros(nTotalFrames, prod(sz));
+            
+            
+            nTrials = numel(h.trial);
+            for kTrial = 1:nTrials
+                fprintf('%d / %d \n', kTrial, nTrials)
+                frameIdx = frameCounter + (1:numel(h.trial(kTrial).frameTimes));
+                
+                nFrames = numel(frameIdx);
+                
+                xtmp = zeros(nFrames, prod(sz));
+                
+                % get upper left corner of the squares
+                xUL = squeeze(h.trial(kTrial).pos(1,:,:))';
+                yUL = squeeze(h.trial(kTrial).pos(2,:,:))';
+                % lower right corner
+                xLR = squeeze(h.trial(kTrial).pos(3,:,:))';
+                yLR = squeeze(h.trial(kTrial).pos(4,:,:))';
+                
+                % eye position at frame flip (in pixels)
+                eyeX = h.trial(kTrial).eyePosAtFrame(:,1);
+                eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
+                
+                if ip.Results.correctEyePos
+%                     x_ = bsxfun(@minus, x, eyeX);
+%                     y_ = bsxfun(@minus, y, eyeY);
+                    
+                    xUL_ = bsxfun(@minus, xUL, eyeX);
+                    yUL_ = bsxfun(@minus, yUL, eyeY);
+                    xLR_ = bsxfun(@minus, xLR, eyeX);
+                    yLR_ = bsxfun(@minus, yLR, eyeY);
+                else
+                    xUL_ = xUL - h.display.ctr(1);
+                    yUL_ = yUL - h.display.ctr(2);
+                    xLR_ = xLR - h.display.ctr(1);
+                    yLR_ = yLR - h.display.ctr(2);
+                end
+                
+                % flip y, because pixels count from top left to bottom
+                % right
+%                 y_ = -y_;
+                yUL_ = -yUL_;
+                yLR_ = -yLR_;
+                
+%                 figure(1); clf
+%                 plot(xx(:), yy(:), '.k'); hold on
+%                 for iSquare = 1:size(xUL_,2)
+%                     for iFrame = 1:size(xUL_,1)
+%                         plot([xUL_(iFrame,iSquare) xLR_(iFrame,iSquare)], [yUL_(iFrame,iSquare) yLR_(iFrame,iSquare)], '-'); hold on
+%                     end
+%                 end
+%                 
+% %                 figure(2); clf
+%                 tmp2 = zeros(size(xx));
+%                 for iSquare = 1:size(xUL_,2)
+%                     for iFrame = 1:size(xUL_,1)
+%                         tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
+%                             & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
+%                             
+% %                          tmp =    (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
+%                         tmp2 = tmp2 + tmp;
+%                 
+%                     end
+%                 end
+%                 imagesc(tmp2)
+%                 drawnow
+                
+%                 
+                
+                for iSquare = 1:size(xUL_,2)
+                    for iFrame = 1:size(xUL_,1)
+                        tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
+                            & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
+                        xtmp(iFrame,:) = xtmp(iFrame,:) + tmp(:)';
+                    end
+                end
+%                 
+                figure(1); clf
+                subplot(1,2,1)
+                imagesc(reshape(sum(xtmp), sz))
+                subplot(1,2,2)
+                imagesc(xtmp)
+                drawnow
+                
+%                 % ignore values that are outside the window
+%                 off = (x_ < winx(1) | x_ > winx(2)) | (y_ < winy(1) | y_ > winy(2));
+%                 x_(off) = nan;
+%                 y_(off) = nan;
+%                 
+%                 figure(1); clf
+%                 xbin = binx(x_ - winx(1));
+%                 ybin = biny(y_ - winy(1));
+%                 
+%                 for k = 1:size(xbin,2)
+%                     stimOn = find(~(isnan(xbin(:,k)) | isnan(ybin(:,k))));
+%                     
+%                     xyind = sub2ind(sz, ybin(stimOn,k), xbin(stimOn,k));
+%                     
+%                     ind = sub2ind([nFrames, prod(sz)], stimOn, xyind);
+%                     
+%                     xtmp(ind) = xtmp(ind) + 1;
+%                     
+%                 end
+                
+                X(frameIdx,:) = xtmp;
+                
+                frameCounter = frameCounter + nFrames;
+                
+            end
+            
+            S.X    = X;
+            S.bins = flipTimes(:);
+            S.size = sz;
+            S.xax  = (1:sz(2)) * binSize / ppd + winx(1)/ppd;
+            S.yax  = (1:sz(1)) * binSize / ppd + winy(1)/ppd;
             
         end
         
-        function [Xd, XX] = buildDesignMatrix(h, S, nkTime)
+        function [Xd, XX] = buildDesignMatrix(~, S, nkTime)
             
             Xd  = rfmap.makeStimRowsDense(S.X, nkTime);
             
@@ -326,6 +493,7 @@ classdef squareFlash < handle
             
             
         end
+        
         
         function D = lssmooth(h, S, Xd, spikeTimes, rho)
             

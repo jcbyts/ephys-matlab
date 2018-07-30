@@ -2,7 +2,7 @@ function thisSession = runSingleChannelSpikeSortThreshold(ops)
 
 if istable(ops)
     thisSession = ops;
-    ops = io.loadOps(ops);
+    ops = io.loadOps(thisSession);
 else
     thisSession = [];
 end
@@ -28,6 +28,7 @@ Fs = info.sampleRate; % sampling rate
 clustOffset = 0;
 refms = 1.0;
 ref_period = floor(Fs*refms/1000);  % 2 ms
+threshold = -4;  % SD of data
 
 for iCh = 1:nChannels
     
@@ -40,7 +41,7 @@ for iCh = 1:nChannels
   zdata = flipud(zdata);
   SD_data = std(zdata);
    
-  threshold = -4;  % SD of data
+
   fthresh = threshold * SD_data;
   got_thresh = 0;  % cycle command line to pick threshold
 
