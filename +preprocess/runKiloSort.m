@@ -1,4 +1,4 @@
-function success = runKiloSort(ops, varargin)
+function thisSession = runKiloSort(thisSession, varargin)
 % runKiloSort runs Kilosort on data files
 % It can either take in an ops struct (as specified in the Kilosort
 % github) or it can take session meta table
@@ -11,6 +11,8 @@ function success = runKiloSort(ops, varargin)
 % preprocess.runKilosort(meta(1,:));
 
 % detect if this is a meta object
+ops = thisSession;
+
 if isa(ops, 'table')
     disp('Session Meta detected.')
     if isnan(ops.oe2dat) || ~ops.oe2dat
@@ -53,11 +55,30 @@ for i = 1:numel(ops)
     end
 end
 
+if istable(thisSession)
+    newThisSession = thisSession;
+    
+    ssList = thisSession.SpikeSorting{1};
+    if ~isnan(ssList)
+        ssList = regexp(ssList, ',', 'split');
+        ssList = union(ssList, {'Kilo'});
+        ssList = sprintf('%s,', ssList{:});
+        newThisSession.SpikeSorting{1} = ssList(1:end-1);
+    else
+        ssList = {'Kilo'};
+        ssList = sprintf('%s,', ssList{:});
+        newThisSession.SpikeSorting{1} = ssList(1:end-1);
+    end
+    
+    io.writeMeta(newThisSession, 2)
+    thisSession = newThisSession;
+end
+
 
 function success = run_KiloSort_helper(ops, varargin)
 
 ip = inputParser();
-ip.addOptional('merge',     true)
+ip.addOptional('merge',     false)
 ip.addOptional('GPU',       true)
 ip.addOptional('parfor',    true)
 ip.addOptional('verbose',   true)
@@ -87,6 +108,7 @@ ops = io.convertOpsToNewDirectory(ops, LOCAL_DIR);
 assert(~strcmp(mess, 'MATLAB:MKDIR:DirectoryExists'), 'tmp directory exists. clean it up.')
     
 copyfile(fullfile(OLD_DIR, 'ephys.dat'), ops.fbinary)
+copyfile(fullfile(OLD_DIR, 'ephys_info.mat'), fullfile(ops.root, 'ephys_info.mat'))
 copyfile(fullfile(OLD_DIR, 'chanMap.mat'), ops.chanMap)
 
 if isfield(ops, 'parfor_')
@@ -115,29 +137,90 @@ rez                = fitTemplates(rez, DATA, uproj);  % fit templates iterativel
 pause(.5) % sometimes kilosort crashes. try pausing
 rez                = fullMPMU(rez, DATA);% extract final spike times (overlapping extraction)
 
+
+
+
 if ops.GPU
     reset(gpu)
 end
 
+
+% copyfile(ops.fproc, fullfile(OLD_DIR,'tempWh.dat'))
 ops = io.convertOpsToNewDirectory(ops, OLD_DIR);
 
 % saving
 fprintf('saving matlab results file\n')
 save(fullfile(ops.root,  'rez.mat'), 'rez', 'ops', '-v7.3');
 
-if merge
-    fprintf('Attemptying Automerge\n')
-    rez                = merge_posthoc3(rez);
-end
-
 fprintf('saving python files for Phy\n')
 
 % save python results file for Phy
 rezToPhy(rez, ops.root);
 
+
+fprintf('Saving high-pass filtered data for phy\n')
+
+fprintf('Copying whitened datafile to server\n')
+
+if isfield(ops,'fslow')&&ops.fslow<ops.fs/2
+    [b1, a1] = butter(3, [ops.fshigh/ops.fs,ops.fslow/ops.fs]*2, 'bandpass');
+else
+    [b1, a1] = butter(3, ops.fshigh/ops.fs*2, 'high');
+end
+
+dataRAW = io.loadRaw(ops, [], false);
+dataRAW = double(dataRAW');
+    
+dataRAW = bsxfun(@minus, dataRAW, mean(dataRAW,2));
+    
+datr = filter(b1, a1, dataRAW);
+datr = flipud(datr);
+datr = filter(b1, a1, datr);
+datr = flipud(datr);
+
+datr = int16(datr');
+
+fid = fopen(ops.fproc, 'w'); % open writing
+    
+fwrite(fid, datr, 'int16');
+    
+fclose(fid);
+fprintf('Done\n')
+
+if merge
+    fprintf('Attemptying Automerge\n')
+    rez                = merge_posthoc3(rez);
+    fprintf('saving python files for Phy\n')
+    % save python results file for Phy
+    rezToPhy(rez, ops.root);
+end
+
+
+% rezToPhy(rez, fullfile(LOCAL_DIR, );
 % remove temporary file
 % delete(ops.fproc);
-rmdir(LOCAL_DIR, 's')
+% rmdir(LOCAL_DIR, 's')
+
+fprintf('Kilo tmp folder is [%s]\n', LOCAL_DIR)
+
+% copy files that are required for phy back to the local disk
+phy_files = {'params.py', 'amplitudes.npy', 'channel_map.npy', 'channel_positions.npy', 'pc_features.npy', ...
+    'pc_feature_ind.npy', 'similar_templates.npy', 'spike_clusters.npy', 'spike_templates.npy', ...
+    'spike_times.npy', 'templates.npy', 'templates_ind.npy', 'template_features.npy', ...
+    'template_feature_ind.npy', 'whitening_mat.npy', 'whitening_mat_inv.npy', 'rez.mat', 'tempWh.dat'};
+
+newPath = regexp(ops.root, '\\', 'split');
+
+fprintf('Copying files for phy over to the local disk\n')
+for iFile = 1:numel(phy_files)
+    server_file = fullfile(ops.root, phy_files{iFile});
+    if exist(server_file, 'file')
+        fprintf('%[s]\n', phy_files{iFile})
+        copyfile(server_file, fullfile(LOCAL_DIR, newPath{end}, phy_files{iFile}))
+    end
+end
+
+fprintf('Kilo tmp folder is [%s]\n', LOCAL_DIR)
+fprintf('Done')
 
 success = true;
-
