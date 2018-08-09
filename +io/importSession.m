@@ -23,6 +23,13 @@ if ~exist('thisSession', 'var') || isempty(thisSession) % no session passed in
     directoryname = uigetdir(SERVER_DATA_DIR, 'Pick session to import');
     meta = io.getMetaTable();
     directory = strrep(directoryname, SERVER_DATA_DIR, ''); % path relative to server data dir
+    
+    if contains(directory, filesep)
+        directory = strrep(directory, filesep, '');
+    end
+    
+    assert(isdir(fullfile(SERVER_DATA_DIR, directory)), 'Selected folder is not in the SERVER directory')
+    
     sessionix = find(strcmp(meta.Directory, directory));
     if isempty(sessionix) % session does not exist yet
         disp('The session does not exist in the meta data table yet.')

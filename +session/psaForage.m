@@ -61,7 +61,7 @@ classdef psaForage < handle
                 
                 if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
                     
-                    if pdsDate > datenum(2018, 07, 30)
+                    if pdsDate > datenum(2018, 08, 15)
                         trial = session.psaForage.importPDS_v2(PDS);
                     elseif pdsDate > datenum(2018, 02, 01)
                         trial = session.psaForage.importPDS_v1(PDS);

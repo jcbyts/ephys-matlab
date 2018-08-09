@@ -31,7 +31,9 @@ classdef WaveformSelector < matlab.apps.AppBase
 
         % Create UIFigure and components
         function createComponents(app)
-
+            
+            opengl hardwarebasic
+            
             % Create UIFigure
             app.UIFigure = uifigure;
             app.UIFigure.Position = [1100 200 200 300];
@@ -56,7 +58,7 @@ classdef WaveformSelector < matlab.apps.AppBase
             ylabel(app.AxEnergy, 'Nonlinear Energy');
             app.AxEnergy.Position = [.1 .5 .3 .4];
             
-            % Create Axes for plotting
+            % Waveforms
             app.AxWaveforms = axes(app.Figure);
             xlabel(app.AxWaveforms, 'Channel');
             ylabel(app.AxWaveforms, 'mV');
@@ -102,22 +104,6 @@ classdef WaveformSelector < matlab.apps.AppBase
     methods (Access = private)
         function UpdatePlotting(app)
             
-            if isempty(app.selectedid)
-                app.hEnSelected.XData = nan;
-                app.hEnSelected.YData = nan;
-                
-                app.hTimeSelected.XData = nan;
-                app.hTimeSelected.YData = nan;
-            else
-                app.hEnSelected.XData   = app.EN(app.selectedid);
-                app.hEnSelected.YData   = app.NLEN(app.selectedid);
-                
-                app.hTimeSelected.XData = app.SS(app.selectedid);
-                app.hTimeSelected.YData = app.EN(app.selectedid);
-                
-                set(app.hWFUnselected(app.selectedid), 'Color', 'r')
-            end
-            
             if isempty(app.unselectedid)
                 app.hEnUnselected.XData = nan;
                 app.hEnUnselected.YData = nan;
@@ -132,8 +118,36 @@ classdef WaveformSelector < matlab.apps.AppBase
                 app.hTimeUnselected.XData = app.SS(app.unselectedid);
                 app.hTimeUnselected.YData = app.EN(app.unselectedid);
                 
-                set(app.hWFUnselected(app.unselectedid), 'Color', .5*[1 1 1])
+                mm = mean(app.WF(:,app.unselectedid),2);
+                sd = std(app.WF(:,app.unselectedid),[],2);
+                n = numel(mm);
+                hold(app.AxWaveforms, 'off')
+                app.hWFUnselected   = plot(app.AxWaveforms, 1:n, mm, 'k', 1:n, mm+sd, 'k--', 1:n, mm-sd, 'k--');
+                hold(app.AxWaveforms, 'on')
             end
+            
+            if isempty(app.selectedid)
+                app.hEnSelected.XData = nan;
+                app.hEnSelected.YData = nan;
+                
+                app.hTimeSelected.XData = nan;
+                app.hTimeSelected.YData = nan;
+            else
+                app.hEnSelected.XData   = app.EN(app.selectedid);
+                app.hEnSelected.YData   = app.NLEN(app.selectedid);
+                
+                app.hTimeSelected.XData = app.SS(app.selectedid);
+                app.hTimeSelected.YData = app.EN(app.selectedid);
+                
+                
+                mm = mean(app.WF(:,app.unselectedid),2);
+                sd = std(app.WF(:,app.unselectedid),[],2);
+                n = numel(mm);
+                hold(app.AxWaveforms, 'off')
+                app.hWFUnselected   = plot(app.AxWaveforms, app.WF(:,app.selectedid));
+            end
+            
+            
         end
         
         % Button pushed function: FinishSessionButton
@@ -162,7 +176,8 @@ classdef WaveformSelector < matlab.apps.AppBase
         % Button pushed function: SelectPointsButton
         function SelectPointsButtonPushed(app, event)
             axes(app.AxEnergy)
-            
+            title(app.AxEnergy, 'Click to create a polygon. Press enter to select', 'Fontweight', 'normal')
+%             app.AxEnergy.Title.String = '
             [x,y] = ginput();
             
             in = inpolygon(app.EN,app.NLEN,x,y);
@@ -210,11 +225,10 @@ classdef WaveformSelector < matlab.apps.AppBase
             app.hEnSelected     = plot(app.AxEnergy, nan, nan, '.r');
             app.hTimeUnselected = plot(app.AxTime, app.SS, app.EN, '.k');
             app.hTimeSelected   = plot(app.AxTime, nan, nan, '.r');
-            app.hWFUnselected   = plot(app.AxWaveforms, app.WF, 'Color', .5*[1 1 1]);
-            app.hWFSelected     = plot(app.AxWaveforms, nan, 'r');
-       
-%             % Register the app with App Designer
-%             registerApp(app, app.UIFigure)
+            mm = mean(app.WF,2);
+            sd = std(WF,[],2);
+            n = numel(mm);
+            app.hWFUnselected   = plot(app.AxWaveforms, 1:n, mm, 'k', 1:n, mm+sd, 'k--', 1:n, mm-sd, 'k--');
 
             if nargout == 0
                 clear app
