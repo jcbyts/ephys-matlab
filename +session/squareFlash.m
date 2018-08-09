@@ -11,6 +11,11 @@ classdef squareFlash < handle
     methods
         function h = squareFlash(PDS, varargin)
             
+            ip = inputParser();
+            ip.addOptional('eyetrace', [])
+            ip.addOptional('saccades', [])
+            ip.parse(varargin{:})
+            
             stim = 'SpatialMapping';
             
             
@@ -38,6 +43,63 @@ classdef squareFlash < handle
             
             
             h.numTrials = numel(h.trial);
+            
+            % --- import eye position
+            eyepos = ip.Results.eyetrace;
+            if ~isempty(eyepos)
+               if size(eyepos,2) < size(eyepos,1)
+                   eyepos = eyepos';
+               end
+               
+               assert(size(eyepos,1) >= 3, 'the first row must be timestamps')
+               
+               
+               if ~isstruct(ip.Results.saccades)                   
+                   sampleRate = 1/mode(diff(eyepos(1,:)));
+                   ix = ~any(isnan(eyepos(2,:)));
+                   [saccades] = pdsa.detectSaccades(eyepos(1,ix), eyepos(2:3,ix), ...
+                       'verbose', false, ...
+                       'filterPosition', 1, ...
+                       'filterLength', ceil(20/sampleRate*1e3), ... % 40 ms smoothing for velocity computation
+                       'detectThresh', 200, ...
+                       'startThresh', 5, ...
+                       'minIsi', ceil(50/sampleRate*1e3), ...
+                       'minDur', ceil(4/sampleRate*1e3), ... % 4 ms
+                       'blinkIsi', ceil(40/sampleRate*1e3));
+               else
+                   saccades = ip.Results.saccades;
+               end
+               
+               if size(eyepos,1) == 4
+                   pupil = eyepos(4,:);
+               else
+                   pupil = [];
+               end
+               
+               for kTrial = 1:h.numTrials
+                   
+                   % include time before the trial starts
+                   preTrial = 1.5;
+                   
+                   % find valid eye position
+                   iix = (eyepos(1,:) > (h.trial(kTrial).start - preTrial)) & (eyepos(1,:) < (h.trial(kTrial).start + h.trial(kTrial).duration));
+                   h.trial(kTrial).eyeSampleTime = eyepos(1,iix);
+                   h.trial(kTrial).eyeXDeg = eyepos(2,iix);
+                   h.trial(kTrial).eyeYDeg = eyepos(3,iix);
+                   if ~isempty(pupil)
+                        h.trial(kTrial).pupilArea = pupil(iix);
+                   end
+                   
+                   % valid saccade times
+                   iix = (saccades.start > (h.trial(kTrial).start - preTrial)) & (saccades.end < (h.trial(kTrial).start + h.trial(kTrial).duration));
+                   fields = fieldnames(saccades);
+                   for iField = 1:numel(fields)
+                       newfield = ['sac_' fields{iField}];
+                       h.trial(kTrial).(newfield) = saccades.(fields{iField})(iix);
+                   end
+               end
+
+            end
             
             
         end % constructor
@@ -133,19 +195,30 @@ classdef squareFlash < handle
             for kTrial = 1:nTrials
                 
                 
+                
                 fprintf('%d / %d \n', kTrial, nTrials)
                 frameIdx = frameCounter + (1:numel(h.trial(kTrial).frameTimes));
                 
                 nFrames = numel(frameIdx);
                 
                 iFrame = 1;
+                
+                numSquares = size(h.trial(kTrial).pos,2);
+                for iSquare = 1:numSquares
+                    pos = round(squeeze(h.trial(kTrial).pos(:,2,iFrame)));
+                    
+                    i = pos(2):pos(4);
+                    j = pos(1):pos(3);
+                    I(sub2ind(h.display.winRect(3:4), i, j)) = 1;
+                    imagesc(I)
+                end
                 eyeXY = h.trial(kTrial).eyePosAtFrame(iFrame,:);
                 % get upper left corner of the squares
-                xUL = squeeze(h.trial(kTrial).pos(1,:,iFrame))';
-                yUL = squeeze(h.trial(kTrial).pos(2,:,iFrame))';
+                xUL = round(squeeze(h.trial(kTrial).pos(1,:,iFrame)))';
+                yUL = round(squeeze(h.trial(kTrial).pos(2,:,iFrame)))';
                 % lower right corner
-                xLR = squeeze(h.trial(kTrial).pos(3,:,iFrame))';
-                yLR = squeeze(h.trial(kTrial).pos(4,:,iFrame))';
+                xLR = round(squeeze(h.trial(kTrial).pos(3,:,iFrame)))';
+                yLR = round(squeeze(h.trial(kTrial).pos(4,:,iFrame)))';
                 figure(1); clf
                 plot(xUL, yUL, '.')
                 
@@ -243,8 +316,11 @@ classdef squareFlash < handle
 %                     xtmp(ind) = xtmp(ind) + 1;
 %                     
 %                 end
-                
-                X(frameIdx,:) = xtmp;
+                sac_buffer = 10e-3;
+                sacStartInds = bsxfun(@gt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_start(:)'-sac_buffer);
+                sacStopInds  = bsxfun(@lt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_end(:)'+sac_buffer);
+                fixations = ~any(sacStartInds & sacStopInds, 2);
+                X(frameIdx(fixations),:) = xtmp(fixations,:);
                 
                 frameCounter = frameCounter + nFrames;
                 
@@ -285,7 +361,6 @@ classdef squareFlash < handle
             
             ip = inputParser();
             ip.addParameter('trialIdx', 1:h.numTrials)
-            ip.addParameter('nTimeLags', 30)
             ip.addParameter('correctEyePos', true)
             ip.addParameter('window', [-5 5])
             ip.addParameter('binSize', 1)
@@ -297,7 +372,9 @@ classdef squareFlash < handle
             
             ppd = h.display.ppd;
             
-            win = ip.Results.window*ppd;
+            win = ip.Results.window*ppd; % convert window into pixels
+            
+            % check if window has the same size for x and y
             if numel(win) == 4
                 winx = win([1 3]);
                 winy = win([2 4]);
@@ -306,20 +383,19 @@ classdef squareFlash < handle
                 winy = win;
             end
             
-            binSize = ip.Results.binSize*ppd;
+            binSize = ip.Results.binSize*ppd; % convert the bin size to pixels
             
             % spatial coordinates (in pixels)
             xax = winx(1):binSize:winx(2);
             yax = winy(1):binSize:winy(2);
             [xx,yy] = meshgrid(xax, yax);
             
+            % get the dimensions of the space
             sz = size(xx);
             nTotalFrames = sum(arrayfun(@(x) numel(x.frameTimes), h.trial));
             
             
             h.design.trialIdx = ip.Results.trialIdx;
-            h.design.nkTime   = ip.Results.nTimeLags;
-            
             
             frameCounter = 0;
             
@@ -329,15 +405,20 @@ classdef squareFlash < handle
             nTrials = numel(h.trial);
             for kTrial = 1:nTrials
                 fprintf('%d / %d \n', kTrial, nTrials)
+
+                % index into X
                 frameIdx = frameCounter + (1:numel(h.trial(kTrial).frameTimes));
                 
+                % number of frames this trial
                 nFrames = numel(frameIdx);
                 
-                xtmp = zeros(nFrames, prod(sz));
+                % X for this trial
+                Xtrial = zeros(nFrames, prod(sz));
                 
                 % get upper left corner of the squares
                 xUL = squeeze(h.trial(kTrial).pos(1,:,:))';
                 yUL = squeeze(h.trial(kTrial).pos(2,:,:))';
+
                 % lower right corner
                 xLR = squeeze(h.trial(kTrial).pos(3,:,:))';
                 yLR = squeeze(h.trial(kTrial).pos(4,:,:))';
@@ -347,9 +428,6 @@ classdef squareFlash < handle
                 eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
                 
                 if ip.Results.correctEyePos
-%                     x_ = bsxfun(@minus, x, eyeX);
-%                     y_ = bsxfun(@minus, y, eyeY);
-                    
                     xUL_ = bsxfun(@minus, xUL, eyeX);
                     yUL_ = bsxfun(@minus, yUL, eyeY);
                     xLR_ = bsxfun(@minus, xLR, eyeX);
@@ -396,15 +474,15 @@ classdef squareFlash < handle
                     for iFrame = 1:size(xUL_,1)
                         tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
                             & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
-                        xtmp(iFrame,:) = xtmp(iFrame,:) + tmp(:)';
+                        Xtrial(iFrame,:) = Xtrial(iFrame,:) + tmp(:)';
                     end
                 end
 %                 
                 figure(1); clf
                 subplot(1,2,1)
-                imagesc(reshape(sum(xtmp), sz))
+                imagesc(reshape(sum(Xtrial), sz))
                 subplot(1,2,2)
-                imagesc(xtmp)
+                imagesc(Xtrial)
                 drawnow
                 
 %                 % ignore values that are outside the window
@@ -423,11 +501,20 @@ classdef squareFlash < handle
 %                     
 %                     ind = sub2ind([nFrames, prod(sz)], stimOn, xyind);
 %                     
-%                     xtmp(ind) = xtmp(ind) + 1;
+%                     Xtrial(ind) = Xtrial(ind) + 1;
 %                     
 %                 end
-                
-                X(frameIdx,:) = xtmp;
+
+                % if clipping out saccades
+                if isfield(h.trial, 'sac_start')
+                    sac_buffer = 10e-3;
+                    sacStartInds = bsxfun(@gt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_start(:)'-sac_buffer);
+                    sacStopInds  = bsxfun(@lt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_end(:)'+sac_buffer);
+                    fixations = ~any(sacStartInds & sacStopInds, 2);
+                    X(frameIdx(fixations),:) = Xtrial(fixations,:);
+                else
+                    X(frameIdx,:) = Xtrial;
+                end
                 
                 frameCounter = frameCounter + nFrames;
                 
