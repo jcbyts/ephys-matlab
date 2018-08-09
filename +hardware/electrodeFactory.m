@@ -17,6 +17,7 @@ if nargin == 0
         'MTsingleCh25', ...
         'V1singleCh25', ...
         'ShankA', ...
+        'ShankB', ...
         };
     
     name = io.selectFromList(shankList);
@@ -111,5 +112,9 @@ switch name
         shank{1} = hardware.electrode.AtlasE32R35S1L8NT;
         shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
         shank{1}.name = 'ShankA';
+	case 'ShankB'
+        shank{1} = hardware.electrode.AtlasE32R35S1L8NT;
+        shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
+        shank{1}.name = 'ShankB';
         
 end
