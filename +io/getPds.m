@@ -50,20 +50,22 @@ for kPdsFile = 1:nPdsFiles
     % check that you have the proper PLDAPS and PEP branches currently in
     % the path to ensure that all objects are recreated properly
     
-    % I hate regexp! why is it so confusing!?
-    branch = regexp(tmp.PDS.initialParametersMerged.git.pep.status, '(?<=branch\s)(\w+)', 'match');
-    data_branch = branch{1};
-    [pep_path, ~] = fileparts(which('calibrationGUI.m'));
-    curr_path = pwd;
-    
-    cd(pep_path);
-    stat = pds.git.git('status');
-    cd(curr_path)
-    branch = regexp(stat, '(?<=branch\s)(\w+)', 'match');
-    curr_branch = branch{1};
-    assert(strcmp(data_branch, curr_branch), 'You are on the wrong branch of PEP')
-    
-    
+    if tmp.PDS.initialParametersMerged.git.use
+        branch = regexp(tmp.PDS.initialParametersMerged.git.pep.status, '(?<=branch\s)(\w+)', 'match');
+        data_branch = branch{1};
+        [pep_path, ~] = fileparts(which('calibrationGUI.m'));
+        curr_path = pwd;
+        
+        cd(pep_path);
+        stat = pds.git.git('status');
+        cd(curr_path)
+        branch = regexp(stat, '(?<=branch\s)(\w+)', 'match');
+        curr_branch = branch{1};
+        assert(strcmp(data_branch, curr_branch), 'You are on the wrong branch of PEP')
+    else
+        old_pep_path = 'C:\Users\Jake\Repos\pds-stimuli-pldapsGUI\';
+        addpath(old_pep_path)
+    end
     
     if ~isempty(tmp.PDS.functionHandles)
         fhlist = fieldnames(tmp.PDS.functionHandles);
