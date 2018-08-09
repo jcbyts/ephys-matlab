@@ -162,13 +162,17 @@ tic
 for k = 1:nBlocks
     fprintf('Block %d\n', k)
     
-    for j = 1:numChannels
-        fid{j}             = fopen(fullfile(fs{j}(k).folder, fs{j}(k).name));
+    % preallocate samples
+    filename = fullfile(fs{j}(k).folder, fs{j}(k).name);
+	data_seg = load_open_ephys_data_faster(filename, 'unscaledInt16');
+    samples  = zeros(numChannels, numel(data_seg), 'int16');
         
-        % --- Check that OE version is correct
-        fseek(fid{j},0,'bof');
-        hdr = fread(fid{j}, NUM_HEADER_BYTES, 'char*1');
-        info_ = getHeader(hdr);
+    for j = 1:numChannels
+        fprintf('Channel %d\n', j)
+        
+        filename = fullfile(fs{j}(k).folder, fs{j}(k).name);
+        [data_seg, timestamps_seg, info_] = load_open_ephys_data_faster(filename, 'unscaledInt16');
+        
         assert(info_.header.version == 0.4, 'open ephys version has changed. You must now check that everything still works. Sorry, Jake')
         
         % --- save header info
@@ -186,39 +190,23 @@ for k = 1:nBlocks
         
         % --- get timestamps from this file
         if j==1
-            % get file size
-            fseek(fid{j},0,'eof');
-            filesize  = ftell(fid{j});
-            numIdx = floor((filesize - NUM_HEADER_BYTES)/BLOCK_BYTES);
-            
-            % skip header again
-            fseek(fid{j}, NUM_HEADER_BYTES, 'bof');
-            
-            % read timestamps
-            seg = fread(fid{j}, numIdx, '1*int64', BLOCK_BYTES - 8, 'l');
-            
             % save timestamps of all starts and stops
-            ts_ = seg(1);
-            ns_ = numel(seg)*SAMPLES_PER_RECORD;
-            stops = find(diff(seg)~=SAMPLES_PER_RECORD)+1;
-            
-            % ignore interruptions that occured on the last sample. This is
-            % rare and appears to cause aligment problems with tracking
-            % timestamps. It will create a fragment that is length = 0.
-            stops(numel(seg)==stops) = []; % interruption on the last sample
+            ts_ = timestamps_seg(1);
+            ns_ = numel(data_seg);
+            stops = find(round(diff(info_.header.sampleRate*timestamps_seg))~=1);
             
             if any(stops)
-                ts_ = [ts_ seg(stops)'];
-                ns_ = diff([0 stops(:)' numel(seg)])*SAMPLES_PER_RECORD;
+                ts_ = [ts_ timestamps_seg(stops)'];
+                ns_ = diff([0 stops(:)' ns_]);
                 
-% Uncomment this if debugging timestamps                
-%                  fprintf('Found multiple paused segments\n')
-%                  figure
-%                  plot(seg, '.')
-%                  hold on
-%                  plot(cumsum([[0 ns_(1:end-1)]; ns_], 2)/SAMPLES_PER_RECORD, [ts_; ts_])
-
-
+                % Uncomment this if debugging timestamps
+                %                  fprintf('Found multiple paused segments\n')
+                %                  figure
+                %                  plot(seg, '.')
+                %                  hold on
+                %                  plot(cumsum([[0 ns_(1:end-1)]; ns_], 2)/SAMPLES_PER_RECORD, [ts_; ts_])
+                
+                
             end
             
             nFragments = numel(ns_);
@@ -227,64 +215,25 @@ for k = 1:nBlocks
             % get datetime of recording start
             dn_ =datenum(info_.header.date_created, 'dd-mmm-yyyy HHMMSS');
             
-            info.dateNum = [info.dateNum repmat(dn_,1,nFragments)];
+            info.dateNum    = [info.dateNum repmat(dn_,1,nFragments)];
             info.timestamps = [info.timestamps ts_];
             info.fragments  = [info.fragments ns_];
-            
-            % --- skip header
-            fseek(fid{j}, NUM_HEADER_BYTES, 'bof');
         end
         
-        
+        samples(j,:) = data_seg;
     end
     
+    nsamps = size(samples,2);
+    fwrite(fidout, samples, 'int16');
     
-    % --- save raw data to new binary file
-    nsamps = 0;
-    flag = 1;
-    while 1
-        samples = zeros(nSamples * 1000, numChannels, 'int16');
-        for j = 1:numChannels
-            collectSamps    = zeros(nSamples * 1000, 1, 'int16');
-            
-            rawData         = fread(fid{j}, 1000 * (nSamples + 6), '1030*int16', 10, 'b');
-            
-            nbatches        = ceil(numel(rawData)/(nSamples+6));
-            for s = 1:nbatches
-                rawSamps = rawData((s-1) * (nSamples + 6) +6+ [1:nSamples]);
-                collectSamps((s-1)*nSamples + [1:nSamples]) = rawSamps;
-            end
-            samples(:,j)         = collectSamps;
-        end
-        
-        if nbatches<1000
-            flag = 0;
-        end
-        if flag==0
-            samples = samples(1:s*nSamples, :);
-        end
-        
-        samples         = samples';
-        fwrite(fidout, samples, 'int16');
-        
-        nsamps = nsamps + size(samples,2);
-        
-        if flag==0
-            break;
-        end
-    end
     nSamplesBlocks(k) = nsamps; %#ok<AGROW>
-    
-    for j = 1:numChannels
-        fclose(fid{j});
-    end
     
 end
 
 fclose(fidout);
 
 % convert sample timestamps to time
-info.timestamps = info.timestamps/info.sampleRate;
+% info.timestamps = info.timestamps/info.sampleRate;
 
 save(finfo, '-v7.3', '-struct', 'info')
 
@@ -317,9 +266,9 @@ save(ops.chanMap, 'chanMap', 'xcoords', 'ycoords', 'zcoords', 'connected', 'fs')
 % end
 
 % default number of clusters
-ops.Nfilt               = 4*(ops.Nchan+32-mod(ops.Nchan,32));  % number of clusters to use (2-4 times more than Nchan, should be a multiple of 32)     		
-ops.nNeighPC            = 12; % visualization only (Phy): number of channnels to mask the PCs, leave empty to skip (12)		
-ops.nNeigh              = 16; % visualization only (Phy): number of neighboring templates to retain projections of (16)		
+ops.Nfilt               = 6*(ops.Nchan+32-mod(ops.Nchan,32));  % number of clusters to use (2-4 times more than Nchan, should be a multiple of 32)     		
+ops.nNeighPC            = 8; % visualization only (Phy): number of channnels to mask the PCs, leave empty to skip (12)		
+ops.nNeigh              = 8; % visualization only (Phy): number of neighboring templates to retain projections of (16)		
 		
 % options for channel whitening		
 ops.whitening           = 'noSpikes'; % type of whitening (default 'full', for 'noSpikes' set options for spike detection below)		
@@ -329,26 +278,26 @@ ops.whiteningRange      = 32; % how many channels to whiten together (Inf for wh
 ops.criterionNoiseChannels = 0.2; % fraction of "noise" templates allowed to span all channel groups (see createChannelMapFile for more info). 		
 
 % other options for controlling the model and optimization		
-ops.Nrank               = 3;    % matrix rank of spike template model (3)		
-ops.nfullpasses         = 6;    % number of complete passes through data during optimization (6)		
-ops.maxFR               = 500000;  % maximum number of spikes to extract per batch (20000)		
+ops.Nrank               = 3;        % matrix rank of spike template model (3)		
+ops.nfullpasses         = 6;        % number of complete passes through data during optimization (6)		
+ops.maxFR               = 500e3;    % maximum number of spikes to extract per batch (20000)		
 ops.NotchFilter60       = false;
 ops.softwareReferencing = 'none';
 ops.fshigh              = 300;   % frequency for high pass filtering		
-% ops.fslow             = 2000;   % frequency for low pass filtering (optional)
-ops.artifactThresh      = 300;
+% ops.fslow               = 2500;   % frequency for low pass filtering (optional)
+ops.artifactThresh      = 500;
 ops.artifactNchans      = 12;
 
 ops.ntbuff              = 64;    % samples of symmetrical buffer for whitening and spike detection		
 ops.scaleproc           = 200;   % int16 scaling of whitened data		
-ops.NT                  = 128*1024+ ops.ntbuff;% this is the batch size (try decreasing if out of memory) 		
+ops.NT                  = 2*128*1024+ ops.ntbuff;% this is the batch size (try decreasing if out of memory) 		
 % for GPU should be multiple of 32 + ntbuff		
 		
 % the following options can improve/deteriorate results. 		
 % when multiple values are provided for an option, the first two are beginning and ending anneal values, 		
 % the third is the value used in the final pass. 		
-ops.Th               = [4 10 10]; %[6 12 12];    % threshold for detecting spikes on template-filtered data ([6 12 12])		
-ops.lam              = [5 20 20]; %[10 30 30];   % large means amplitudes are forced around the mean ([10 30 30])		
+ops.Th               = [6 12 12];    % threshold for detecting spikes on template-filtered data ([6 12 12])		
+ops.lam              = [10 30 30];   % large means amplitudes are forced around the mean ([10 30 30])		
 ops.nannealpasses    = 4;            % should be less than nfullpasses (4)		
 ops.momentum         = 1./[20 1000];  % start with high momentum and anneal (1./[20 1000])		
 ops.shuffle_clusters = 1;            % allow merges and splits during optimization (1)		
@@ -362,7 +311,7 @@ ops.loc_range       = [3  1];  % ranges to detect peaks; plus/minus in time and 
 ops.long_range      = [30  6]; % ranges to detect isolated peaks ([30 6])		
 ops.maskMaxChannels = 5;       % how many channels to mask up/down ([5])		
 ops.crit            = .65;     % upper criterion for discarding spike repeates (0.65)		
-ops.nFiltMax        = 10000;   % maximum "unique" spikes to consider (10000)		
+ops.nFiltMax        = 50e3;   % maximum "unique" spikes to consider (10000)		
 		
 % load predefined principal components (visualization only (Phy): used for features)		
 dd                  = load('PCspikes2.mat'); % you might want to recompute this from your own data		
