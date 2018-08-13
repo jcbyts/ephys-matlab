@@ -77,7 +77,7 @@ for kPds = 1:nPds
     elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
     elInfo.bitDeg       = el_info.bitDeg;
     catch
-        warning(sprintf('no edf data for PDS %d', kPds))
+        warning('no edf data for PDS %d', kPds)
     end
     
 end
