@@ -143,7 +143,7 @@ end
 %     cids = cids(~ismember(cids, noiseClusters));
 %     savefname = 'sp-Kilo.mat';
     
-notNoiseClusters = cids(cgs~=0 & cids ~=0 & spikeCounts~=0);
+notNoiseClusters = cids(cgs(:) ~=0 & cids(:) ~=0 & spikeCounts(:) ~=0);
 bigix   = ismember(clu, notNoiseClusters);
 smallix = ismember(cids, notNoiseClusters);
 st = st(bigix);
@@ -192,6 +192,12 @@ sp(f).cgs2 = cgs2;
 sp(f).uQ = uQ;
 sp(f).cR = cR;
 sp(f).isiV = isiV;
+
+fprintf('Clipping waveforms from raw\n')
+raw = io.loadRaw(ops, [], true, true)';
+raw = bsxfun(@minus, raw, mean(raw));
+
+[~, ~, sp(f).wftax, sp(f).wfs] = pdsa.eventTriggeredAverage(raw, double(sp(f).ss), [-10 32]);
 
 end
 

@@ -1,6 +1,5 @@
 function eyepos = getEyePosition(PDS, kTrial)
 
-
 cm = PDS.initialParametersMerged.eyelink.calibration_matrix;
 
 eyeIdx = PDS.initialParametersMerged.eyelink.eyeIdx;
