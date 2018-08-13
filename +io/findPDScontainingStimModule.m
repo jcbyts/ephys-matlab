@@ -21,6 +21,9 @@ for i = 1:numel(PDS)
         elseif any(ixdata)
             ixuse = cellfun(@(x) isfield(x.(stim), 'use'), PDS{i}.data(ixdata));
             inds  = find(ixdata);
+            if isempty(inds) || ~any(ixuse)
+                continue
+            end
             hasStim(i) = any(cellfun(@(x) x.(stim).use, PDS{i}.conditions(inds(ixuse)))) | PDS{i}.initialParametersMerged.(stim).use;
         end
     end

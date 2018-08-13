@@ -45,6 +45,16 @@ fprintf('phy template-gui params.py\n')
 
 fprintf('Then cd into the directory that represents your data\n')
 
+%% 
+
+meta = io.getExperimentsAnd(); % get all experiments meta data
+
+%thisSession = meta(146,:); % choose the exact session you want to look at from the meta table 
+thisSession = meta(end,:); % if you just want the last one
+disp(thisSession)
+
+sp = io.getSpikesFromKilo(thisSession);
+
 %% sort with threshold
 preprocess.runSingleChannelSpikeSortThreshold(thisSession)
 

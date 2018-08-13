@@ -97,6 +97,15 @@ classdef squareFlash < handle
                        newfield = ['sac_' fields{iField}];
                        h.trial(kTrial).(newfield) = saccades.(fields{iField})(iix);
                    end
+                   
+                   % update the eye position at frame to use the offline
+                   % estimate
+                   nFrames = numel(h.trial.frameTimes);
+                   for iFrame = 1:nFrames
+                       iix = h.trial(kTrial).eyeSampleTime > (h.trial.frameTimes(iFrame)) & ( h.trial(kTrial).eyeSampleTime < (h.trial.frameTimes(iFrame) +  h.display.ifi));
+                       h.trial(kTrial).eyePosAtFrame(iFrame,:) = [nanmean(h.trial(kTrial).eyeXDeg(iix)) nanmean(h.trial(kTrial).eyeYDeg(iix))];
+                   end
+                   
                end
 
             end
@@ -124,216 +133,6 @@ classdef squareFlash < handle
             
         end
         
-        function S = binSpaceFrameLoop(h, varargin)
-            % binSpace bins the stimulus at a specified resolution
-            % Inputs (as argument pairs)
-            %   'trialIdx'        - range of trials (default: 1:numTrials)
-            %   'correctEyePos'   - retinal or screen coords (default: true)
-            %   'window'  [1 x 2] - bounds of the window to analyze (degrees)
-            %   'binSize' [1 x 1] - size of each bin (degrees)
-            % Output
-            %   S@struct
-            %       X [time x bins] - stimulus binned in space. Each row is
-            %                         the stimulus frame reshaped to be a
-            %                         single vector of size diff(window)/binSize
-            %       bins [time x 1] - the time of each row of X
-            %       xax  [1 x bins] - x axis (in degrees)
-            %       yax  [1 x bins] - y axis (in degrees)
-            %       size [1 x 2]    - size of spatial stimulus
-            %
-            % Example Call:
-            % S = obj.binSpace('correctEyePos', true, 'window', [-2 2], ...
-            %       'binSize', 1);
-            %
-            % % plot a frame
-            %   imagesc(S.xax, S.yax, reshape(X(1,:), S.sz));
-            
-            
-            ip = inputParser();
-            ip.addParameter('trialIdx', 1:h.numTrials)
-            ip.addParameter('nTimeLags', 30)
-            ip.addParameter('correctEyePos', true)
-            ip.addParameter('window', [-5 5])
-            ip.addParameter('binSize', 1)
-            ip.addParameter('plot', false)
-            ip.parse(varargin{:})
-            
-
-            ppd = h.display.ppd;
-            
-            % conver window into pixel units
-            win = ip.Results.window*ppd;
-            if numel(win) == 4
-                winx = sort(win([1 3]));
-                winy = sort(win([2 4]));
-            else
-                winx = win;
-                winy = win;
-            end
-            
-            binSize = ip.Results.binSize*ppd;
-            
-            % spatial coordinates (in pixels)
-            xax = winx(1):binSize:winx(2);
-            yax = winy(1):binSize:winy(2);
-            [xx,yy] = meshgrid(xax, yax);
-            
-            sz = size(xx);
-            nTotalFrames = sum(arrayfun(@(x) numel(x.frameTimes), h.trial));
-            
-            
-            h.design.trialIdx = ip.Results.trialIdx;
-            h.design.nkTime   = ip.Results.nTimeLags;
-            
-            
-            frameCounter = 0;
-            
-            X = zeros(nTotalFrames, prod(sz));
-            
-            
-            nTrials = numel(h.trial);
-            for kTrial = 1:nTrials
-                
-                
-                
-                fprintf('%d / %d \n', kTrial, nTrials)
-                frameIdx = frameCounter + (1:numel(h.trial(kTrial).frameTimes));
-                
-                nFrames = numel(frameIdx);
-                
-                iFrame = 1;
-                
-                numSquares = size(h.trial(kTrial).pos,2);
-                for iSquare = 1:numSquares
-                    pos = round(squeeze(h.trial(kTrial).pos(:,2,iFrame)));
-                    
-                    i = pos(2):pos(4);
-                    j = pos(1):pos(3);
-                    I(sub2ind(h.display.winRect(3:4), i, j)) = 1;
-                    imagesc(I)
-                end
-                eyeXY = h.trial(kTrial).eyePosAtFrame(iFrame,:);
-                % get upper left corner of the squares
-                xUL = round(squeeze(h.trial(kTrial).pos(1,:,iFrame)))';
-                yUL = round(squeeze(h.trial(kTrial).pos(2,:,iFrame)))';
-                % lower right corner
-                xLR = round(squeeze(h.trial(kTrial).pos(3,:,iFrame)))';
-                yLR = round(squeeze(h.trial(kTrial).pos(4,:,iFrame)))';
-                figure(1); clf
-                plot(xUL, yUL, '.')
-                
-                
-                xtmp = zeros(nFrames, prod(sz));
-                
-                % get upper left corner of the squares
-                xUL = squeeze(h.trial(kTrial).pos(1,:,:))';
-                yUL = squeeze(h.trial(kTrial).pos(2,:,:))';
-                % lower right corner
-                xLR = squeeze(h.trial(kTrial).pos(3,:,:))';
-                yLR = squeeze(h.trial(kTrial).pos(4,:,:))';
-                
-                % eye position at frame flip (in pixels)
-                eyeX = h.trial(kTrial).eyePosAtFrame(:,1);
-                eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
-                
-                if ip.Results.correctEyePos
-%                     x_ = bsxfun(@minus, x, eyeX);
-%                     y_ = bsxfun(@minus, y, eyeY);
-                    
-                    xUL_ = bsxfun(@minus, xUL, eyeX);
-                    yUL_ = bsxfun(@minus, yUL, eyeY);
-                    xLR_ = bsxfun(@minus, xLR, eyeX);
-                    yLR_ = bsxfun(@minus, yLR, eyeY);
-                else
-                    xUL_ = xUL - h.display.ctr(1);
-                    yUL_ = yUL - h.display.ctr(2);
-                    xLR_ = xLR - h.display.ctr(1);
-                    yLR_ = yLR - h.display.ctr(2);
-                end
-                
-                % flip y, because pixels count from top left to bottom
-                % right
-%                 y_ = -y_;
-                yUL_ = -yUL_;
-                yLR_ = -yLR_;
-                
-%                 figure(1); clf
-%                 plot(xx(:), yy(:), '.k'); hold on
-%                 for iSquare = 1:size(xUL_,2)
-%                     for iFrame = 1:size(xUL_,1)
-%                         plot([xUL_(iFrame,iSquare) xLR_(iFrame,iSquare)], [yUL_(iFrame,iSquare) yLR_(iFrame,iSquare)], '-'); hold on
-%                     end
-%                 end
-%                 
-% %                 figure(2); clf
-%                 tmp2 = zeros(size(xx));
-%                 for iSquare = 1:size(xUL_,2)
-%                     for iFrame = 1:size(xUL_,1)
-%                         tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
-%                             & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
-%                             
-% %                          tmp =    (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
-%                         tmp2 = tmp2 + tmp;
-%                 
-%                     end
-%                 end
-%                 imagesc(tmp2)
-%                 drawnow
-                
-%                 
-                
-                for iSquare = 1:size(xUL_,2)
-                    for iFrame = 1:size(xUL_,1)
-                        tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
-                            & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
-                        xtmp(iFrame,:) = xtmp(iFrame,:) + tmp(:)';
-                    end
-                end
-%                 
-                figure(1); clf
-                subplot(1,2,1)
-                imagesc(reshape(sum(xtmp), sz))
-                subplot(1,2,2)
-                imagesc(xtmp)
-                drawnow
-                
-%                 % ignore values that are outside the window
-%                 off = (x_ < winx(1) | x_ > winx(2)) | (y_ < winy(1) | y_ > winy(2));
-%                 x_(off) = nan;
-%                 y_(off) = nan;
-%                 
-%                 figure(1); clf
-%                 xbin = binx(x_ - winx(1));
-%                 ybin = biny(y_ - winy(1));
-%                 
-%                 for k = 1:size(xbin,2)
-%                     stimOn = find(~(isnan(xbin(:,k)) | isnan(ybin(:,k))));
-%                     
-%                     xyind = sub2ind(sz, ybin(stimOn,k), xbin(stimOn,k));
-%                     
-%                     ind = sub2ind([nFrames, prod(sz)], stimOn, xyind);
-%                     
-%                     xtmp(ind) = xtmp(ind) + 1;
-%                     
-%                 end
-                sac_buffer = 10e-3;
-                sacStartInds = bsxfun(@gt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_start(:)'-sac_buffer);
-                sacStopInds  = bsxfun(@lt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_end(:)'+sac_buffer);
-                fixations = ~any(sacStartInds & sacStopInds, 2);
-                X(frameIdx(fixations),:) = xtmp(fixations,:);
-                
-                frameCounter = frameCounter + nFrames;
-                
-            end
-            
-            S.X    = X;
-            S.bins = flipTimes(:);
-            S.size = sz;
-            S.xax  = (1:sz(2)) * binSize / ppd + winx(1)/ppd;
-            S.yax  = (1:sz(1)) * binSize / ppd + winy(1)/ppd;
-            
-        end
-        
         function S = binSpace(h, varargin)
             % binSpace bins the stimulus at a specified resolution
             % Inputs (as argument pairs)
@@ -352,7 +151,7 @@ classdef squareFlash < handle
             %       size [1 x 2]    - size of spatial stimulus
             %
             % Example Call:
-            % S = obj.binSpace('correctEyePos', true, 'window', [-2 2], ...
+            % S = obj.binSpace('correctEyePos', 'no', 'window', [-2 2], ...
             %       'binSize', 1);
             %
             % % plot a frame
@@ -361,10 +160,11 @@ classdef squareFlash < handle
             
             ip = inputParser();
             ip.addParameter('trialIdx', 1:h.numTrials)
-            ip.addParameter('correctEyePos', true)
+            ip.addParameter('correctEyePos', 'no')
             ip.addParameter('window', [-5 5])
             ip.addParameter('binSize', 1)
             ip.addParameter('plot', false)
+            ip.addParameter('saccadeBuffer', .050) % 50 ms
             ip.parse(varargin{:})
             
             
@@ -400,7 +200,7 @@ classdef squareFlash < handle
             frameCounter = 0;
             
             X = zeros(nTotalFrames, prod(sz));
-            
+            valid = false(nTotalFrames, 1); % is the frame valid to analyze
             
             nTrials = numel(h.trial);
             for kTrial = 1:nTrials
@@ -425,23 +225,47 @@ classdef squareFlash < handle
                 
                 % eye position at frame flip (in pixels)
                 eyeX = h.trial(kTrial).eyePosAtFrame(:,1);
+                
+                % flip X position
+                eyeX = -1*(h.trial(kTrial).eyePosAtFrame(:,1) - h.display.ctr(1)) + h.display.ctr(1);
+                
                 eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
                 
-                if ip.Results.correctEyePos
-                    xUL_ = bsxfun(@minus, xUL, eyeX);
-                    yUL_ = bsxfun(@minus, yUL, eyeY);
-                    xLR_ = bsxfun(@minus, xLR, eyeX);
-                    yLR_ = bsxfun(@minus, yLR, eyeY);
-                else
-                    xUL_ = xUL - h.display.ctr(1);
-                    yUL_ = yUL - h.display.ctr(2);
-                    xLR_ = xLR - h.display.ctr(1);
-                    yLR_ = yLR - h.display.ctr(2);
+                switch ip.Results.correctEyePos
+                    case 'simple'
+                        xUL_ = bsxfun(@minus, xUL, eyeX);
+                        yUL_ = bsxfun(@minus, yUL, eyeY);
+                        xLR_ = bsxfun(@minus, xLR, eyeX);
+                        yLR_ = bsxfun(@minus, yLR, eyeY);
+                        Vtrial = true(size(xLR_,1),1);
+                    case 'no'
+                        xUL_ = xUL - h.display.ctr(1);
+                        yUL_ = yUL - h.display.ctr(2);
+                        xLR_ = xLR - h.display.ctr(1);
+                        yLR_ = yLR - h.display.ctr(2);
+                        Vtrial = true(size(xLR_,1),1);
+                    case 'centralNo'
+                        xUL_ = xUL - h.display.ctr(1);
+                        yUL_ = yUL - h.display.ctr(2);
+                        xLR_ = xLR - h.display.ctr(1);
+                        yLR_ = yLR - h.display.ctr(2);
+                        
+                        eyeDist = sqrt( (eyeX - h.display.ctr(1)).^2 + (eyeY - h.display.ctr(2)).^2);
+                        Vtrial = eyeDist(:) < 6*h.display.ppd;
+                        
+                    case 'centralYes'
+                        xUL_ = bsxfun(@minus, xUL, eyeX);
+                        yUL_ = bsxfun(@minus, yUL, eyeY);
+                        xLR_ = bsxfun(@minus, xLR, eyeX);
+                        yLR_ = bsxfun(@minus, yLR, eyeY);
+                        
+                        eyeDist = sqrt( (eyeX - h.display.ctr(1)).^2 + (eyeY - h.display.ctr(2)).^2);
+                        Vtrial = eyeDist(:) < 6*h.display.ppd;
+                        
                 end
                 
                 % flip y, because pixels count from top left to bottom
                 % right
-%                 y_ = -y_;
                 yUL_ = -yUL_;
                 yLR_ = -yLR_;
                 
@@ -507,13 +331,17 @@ classdef squareFlash < handle
 
                 % if clipping out saccades
                 if isfield(h.trial, 'sac_start')
-                    sac_buffer = 10e-3;
+                    sac_buffer = ip.Results.saccadeBuffer;
                     sacStartInds = bsxfun(@gt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_start(:)'-sac_buffer);
                     sacStopInds  = bsxfun(@lt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_end(:)'+sac_buffer);
                     fixations = ~any(sacStartInds & sacStopInds, 2);
-                    X(frameIdx(fixations),:) = Xtrial(fixations,:);
+                    iix = fixations(:) & Vtrial(:);
+                    X(frameIdx(iix),:) = Xtrial(iix,:);
+                    valid(frameIdx(iix)) = true;
                 else
-                    X(frameIdx,:) = Xtrial;
+                    iix = Vtrial(:);
+                    X(frameIdx(iix),:) = Xtrial(iix,:);
+                    valid(frameIdx(iix)) = true;
                 end
                 
                 frameCounter = frameCounter + nFrames;
@@ -521,6 +349,7 @@ classdef squareFlash < handle
             end
             
             S.X    = X;
+            S.valid = valid;
             S.bins = flipTimes(:);
             S.size = sz;
             S.xax  = (1:sz(2)) * binSize / ppd + winx(1)/ppd;
@@ -958,39 +787,6 @@ classdef squareFlash < handle
             
         end
         
-        %
-        %             bins = (1:size(h.design.Xd))*h.display.ifi + h.design.rowTimes(1);
-        %            % bin spikes at the frame rate
-        %             y = histc(spikeTimes, bins);
-        %
-        %             y = y(:);
-        %
-        %             fprintf('\n\n...Running ASD_2D...\n');
-        %
-        %             minlen = 2.5;  % minimum length scale along each dimension
-        %
-        %             nks = [stim.
-        %             tic;
-        %             [kasd,asdstats] = fastASD(stim.x,y,nks,minlen);
-        %             toc;
-        %
-        %
-        %             sta.w = fastASD_2D_hyper_dual(h.design.Xd(:,setdiff(1:size(h.design.Xd,2), h.design.biasCol)), y-mean(y), [h.design.nkTime h.design.nkx*h.design.nky], 1);
-        %             sta.fullRF  = full(reshape(sta.w, [h.design.nkTime h.design.nkx*h.design.nky]));
-        %
-        %             [u,~,v] = svd(sta.fullRF);
-        %             u(:,1) = u(:,1) - mean(u(1:5,1));
-        %             [~, im] = max(abs(u(:,1)));
-        %             sflip = sign(u(im,1));
-        %
-        %             sta.kxs = h.design.kxs;
-        %             sta.kys = h.design.kys;
-        %             sta.RF = reshape(sflip*v(:,1), h.design.nkx, h.design.nky);
-        %             sta.time = (1:h.design.nkTime)*h.display.ifi;
-        %             sta.RFtime = sflip*u(:,1);
-        %
-        %         end
-        
         
         
     end
@@ -1017,6 +813,17 @@ classdef squareFlash < handle
                 end
             else
                 [trial, display] = session.squareFlash.importPDS_v1(PDS);
+            end
+            
+            % --- convert pos to degrees
+            for iTrial = 1:numel(trial)
+                nSquares = size(trial(iTrial).pos,2);
+                for iSquare = 1:nSquares
+                    pospx = squeeze(trial(iTrial).pos(1:4,iSquare,:));
+                    pospx = bsxfun(@minus, pospx, display.ctr');
+                    trial(iTrial).pos(1:2,iSquare,:) = pds.px2deg(pospx(1:2,:), display.viewdist, display.px2w);
+                    trial(iTrial).pos(3:4,iSquare,:) = pds.px2deg(pospx(3:4,:), display.viewdist, display.px2w);
+                end
             end
             
         end
@@ -1136,6 +943,7 @@ classdef squareFlash < handle
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
                 
+                % convert pos to degrees
                 trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
                 
                 eyepos = io.getEyePosition(PDS, thisTrial);
