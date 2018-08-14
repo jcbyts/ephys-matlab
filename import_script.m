@@ -14,23 +14,23 @@ addEphysMatlab
 io.importSession([], 'overwrite', false);
 
 %% load the session from the meta table
-
+%
 meta = io.getExperimentsAnd(); % get all experiments meta data
 
-%thisSession = meta(146,:); % choose the exact session you want to look at from the meta table 
 thisSession = meta(end,:); % if you just want the last one
 disp(thisSession)
 
 %% Import the stimuli
-
+% This loads the PDS files, checks which stimulus sessions were run and
+% adds them to the meta file for search later
 thisSession = io.importStimulusProtocols(thisSession);
 
 %% run artifact rejection
-
+% Use threshold on the energy of the signal to clip waveforms for manual
+% curation
 preprocess.removeArtifactsManual(thisSession);
 
 %% sort with kilosort
-
 preprocess.runKiloSort(thisSession, 'merge', true)
 
 %% Ready to run phy? Run this cell and then follow the prompt
