@@ -20,7 +20,18 @@ if nargin < 3
     overwrite = false;
 end
 
+flipX = false;
+flipY = false;
+
 if isa(sess, 'table') % it's meta data -- load the struct
+    if sess.FlipXEye
+        flipX = true;
+    end
+    
+    if sess.FlipYEye
+        flipY = true;
+    end
+    
     sess = io.loadSession(sess);
 end
 
@@ -51,6 +62,14 @@ if exist(feye, 'file') && ~overwrite
     data(2,data(3,:)==0) = nan;
     
     timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+    
+    if flipX
+        data(1,:) = -data(1,:);
+    end
+    
+    if flipY
+        data(2,:) = -data(2,:);
+    end
     
     return
     
@@ -103,7 +122,13 @@ data(2,data(3,:)==0) = nan;
 
 timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
 
+if flipX
+    data(1,:) = -data(1,:);
+end
 
+if flipY
+    data(2,:) = -data(2,:);
+end
 
 
 end
