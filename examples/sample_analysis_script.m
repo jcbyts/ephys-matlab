@@ -30,7 +30,7 @@ for iShank = 1:nShanks
     else
         clusterIds = [];
     end
-    fig(iShank) = plot.spikeWaveformsFromOps(ops(iShank), sp{iShank}, 'figure', iShank, 'clusterIds', clusterIds, 'numWaveforms', 10);
+    fig(iShank) = plot.spikeWaveformsFromOps(ops(iShank), sp{iShank}, 'figure', iShank, 'clusterIds', clusterIds, 'numWaveforms', 100);
 end
 
 
@@ -51,7 +51,7 @@ Xd = spatialMap.buildDesignMatrix(stim, nTimeBins);
 
 
 %% Plot spatial map for each unit
-for iShank = 1:2
+for iShank = 1
 s = sp{iShank};
 if isfield(s, 'uQ')
     clustIds = s.cids(s.uQ>10);
@@ -165,11 +165,11 @@ if ops(iShank).Nchan > 10
 end
 %%
 % --- saccade-triggered
-eventTimes = saccades(1,:);
+eventTimes = [saccades.start]';
 % find saccades that happened more than 200 ms after the last saccade
 % (uncontaminated)
 ixLong = find([0 diff(eventTimes)>.2]);
-
+lfpInfo.fragments = ceil(lfpInfo.fragments);
 if ops(iShank).Nchan > 10
     subplot(1,2,2)
     plot.CsdBasic(lfp, eventTimes(ixLong), lfpInfo)
@@ -179,7 +179,7 @@ if ops(iShank).Nchan > 10
 end
 
 % Look for saccade-direction tuning in the LFP
-th = cart2pol(saccades(7,:) - saccades(5,:), saccades(8,:) - saccades(6,:))'/pi*180;
+th = cart2pol([saccades.endXpos] - [saccades.startXpos], [saccades.endYpos] - [saccades.startYpos])'/pi*180;
 
 if ops(iShank).Nchan > 10
     figure(2); clf
@@ -238,7 +238,7 @@ iShank = 1;
 figure(3); clf
 s = sp{iShank};
 if isfield(s, 'uQ')
-    goodUnits = s.uQ > 10;
+    goodUnits = s.uQ > 1;
     udepths = s.clusterDepths(goodUnits);
     uId = s.cids(goodUnits);
     [~, depthId] = sort(udepths);
@@ -292,7 +292,7 @@ end
 nUnits = numel(clustIds);
 
 figure(1); clf
-plot.spikeWaveformsFromOps(ops(iShank), s, 'clusterIds', clustIds, 'numWaveforms', 10)
+% plot.spikeWaveformsFromOps(ops(iShank), s, 'clusterIds', clustIds, 'numWaveforms', 10)
 axis off
 figure(2); clf
 ax = pdsa.tight_subplot(nUnits, 2, .01, .01);

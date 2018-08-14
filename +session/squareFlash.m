@@ -10,27 +10,48 @@ classdef squareFlash < handle
     
     methods
         function h = squareFlash(PDS, varargin)
-            
+            % CONSTRUCTOR
+            % h = squareFlash(PDS) creates the squareFlash session object
+            % PDS is a PDS struct or cell array of PDS structs
+            %
+            % Optional Arguments:
+            %   'eyetrace' [n x 4]  the raw eye position data 
+            %                       col 1: timestamp
+            %                       col 2: x position (degrees)
+            %                       col 3: y position (degrees)
+            %                       col 4: pupil
+
+            % parse optional arguments
             ip = inputParser();
             ip.addOptional('eyetrace', [])
             ip.addOptional('saccades', [])
+            ip.addOptional('eyePosPreTrial', 1.5) % seconds before the trial to store
             ip.parse(varargin{:})
             
-            stim = 'SpatialMapping';
             
+            stim = 'SpatialMapping'; % this is the name we use during data colletion. It should always be the same!
             
+             
+            if isstruct(PDS)
+                PDS = {PDS};
+            end
+            
+            % check for PDS files that contain this stimulus module
             hasStim = io.findPDScontainingStimModule(PDS, stim);
-            
             hasStim = hasStim | io.findPDScontainingStimModule(PDS, 'spatialSquares');
             
-            if ~any(hasStim)
+            if ~any(hasStim) % exit program if this stimulus wasn't run
                 return
             end
             
+            % assuming the display parameters didn't change during the
+            % session, store them in the object
             h.display = PDS{find(hasStim,1)}.initialParametersMerged.display;
-                                    
+
+            % Loop over PDS files, importing the stimulus parameters
             for i = find(hasStim(:)')
                 
+                % helper function for the import
                 trial_ = h.importPDS(PDS{i});
                 
                 if isempty(trial_)
@@ -53,8 +74,7 @@ classdef squareFlash < handle
                
                assert(size(eyepos,1) >= 3, 'the first row must be timestamps')
                
-               
-               if ~isstruct(ip.Results.saccades)                   
+               if ~isstruct(ip.Results.saccades)% detect saccades
                    sampleRate = 1/mode(diff(eyepos(1,:)));
                    ix = ~any(isnan(eyepos(2,:)));
                    [saccades] = pdsa.detectSaccades(eyepos(1,ix), eyepos(2:3,ix), ...
@@ -63,23 +83,24 @@ classdef squareFlash < handle
                        'filterLength', ceil(20/sampleRate*1e3), ... % 40 ms smoothing for velocity computation
                        'detectThresh', 200, ...
                        'startThresh', 5, ...
-                       'minIsi', ceil(50/sampleRate*1e3), ...
+                       'minIsi', ceil(30/sampleRate*1e3), ...
                        'minDur', ceil(4/sampleRate*1e3), ... % 4 ms
                        'blinkIsi', ceil(40/sampleRate*1e3));
                else
                    saccades = ip.Results.saccades;
                end
                
-               if size(eyepos,1) == 4
+               if size(eyepos,1) >= 4
                    pupil = eyepos(4,:);
                else
                    pupil = [];
                end
                
+               % Loop over trials and add eye position
                for kTrial = 1:h.numTrials
                    
                    % include time before the trial starts
-                   preTrial = 1.5;
+                   preTrial = ip.Results.eyePosPreTrial;
                    
                    % find valid eye position
                    iix = (eyepos(1,:) > (h.trial(kTrial).start - preTrial)) & (eyepos(1,:) < (h.trial(kTrial).start + h.trial(kTrial).duration));
@@ -100,10 +121,10 @@ classdef squareFlash < handle
                    
                    % update the eye position at frame to use the offline
                    % estimate
-                   nFrames = numel(h.trial.frameTimes);
+                   nFrames = numel(h.trial(kTrial).frameTimes);
                    for iFrame = 1:nFrames
-                       iix = h.trial(kTrial).eyeSampleTime > (h.trial.frameTimes(iFrame)) & ( h.trial(kTrial).eyeSampleTime < (h.trial.frameTimes(iFrame) +  h.display.ifi));
-                       h.trial(kTrial).eyePosAtFrame(iFrame,:) = [nanmean(h.trial(kTrial).eyeXDeg(iix)) nanmean(h.trial(kTrial).eyeYDeg(iix))];
+                       iix = h.trial(kTrial).eyeSampleTime > (h.trial(kTrial).frameTimes(iFrame)) & ( h.trial(kTrial).eyeSampleTime < (h.trial(kTrial).frameTimes(iFrame) +  h.display.ifi));
+                       h.trial(kTrial).eyePosAtFrame(iFrame,:) = [nanmedian(h.trial(kTrial).eyeXDeg(iix)) nanmedian(h.trial(kTrial).eyeYDeg(iix))];
                    end
                    
                end
@@ -169,10 +190,8 @@ classdef squareFlash < handle
             
             
             flipTimes = cell2mat(arrayfun(@(x) x.frameTimes(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
-            
-            ppd = h.display.ppd;
-            
-            win = ip.Results.window*ppd; % convert window into pixels
+                        
+            win = ip.Results.window; % convert window into pixels
             
             % check if window has the same size for x and y
             if numel(win) == 4
@@ -183,7 +202,7 @@ classdef squareFlash < handle
                 winy = win;
             end
             
-            binSize = ip.Results.binSize*ppd; % convert the bin size to pixels
+            binSize = ip.Results.binSize; % convert the bin size to pixels
             
             % spatial coordinates (in pixels)
             xax = winx(1):binSize:winx(2);
@@ -226,8 +245,8 @@ classdef squareFlash < handle
                 % eye position at frame flip (in pixels)
                 eyeX = h.trial(kTrial).eyePosAtFrame(:,1);
                 
-                % flip X position
-                eyeX = -1*(h.trial(kTrial).eyePosAtFrame(:,1) - h.display.ctr(1)) + h.display.ctr(1);
+%                 % flip X position
+%                 eyeX = -1*(h.trial(kTrial).eyePosAtFrame(:,1) - h.display.ctr(1)) + h.display.ctr(1);
                 
                 eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
                 
@@ -239,19 +258,19 @@ classdef squareFlash < handle
                         yLR_ = bsxfun(@minus, yLR, eyeY);
                         Vtrial = true(size(xLR_,1),1);
                     case 'no'
-                        xUL_ = xUL - h.display.ctr(1);
-                        yUL_ = yUL - h.display.ctr(2);
-                        xLR_ = xLR - h.display.ctr(1);
-                        yLR_ = yLR - h.display.ctr(2);
+                        xUL_ = xUL;
+                        yUL_ = yUL;
+                        xLR_ = xLR;
+                        yLR_ = yLR;
                         Vtrial = true(size(xLR_,1),1);
                     case 'centralNo'
-                        xUL_ = xUL - h.display.ctr(1);
-                        yUL_ = yUL - h.display.ctr(2);
-                        xLR_ = xLR - h.display.ctr(1);
-                        yLR_ = yLR - h.display.ctr(2);
+                        xUL_ = xUL;
+                        yUL_ = yUL;
+                        xLR_ = xLR;
+                        yLR_ = yLR;
                         
-                        eyeDist = sqrt( (eyeX - h.display.ctr(1)).^2 + (eyeY - h.display.ctr(2)).^2);
-                        Vtrial = eyeDist(:) < 6*h.display.ppd;
+                        eyeDist = sqrt( (eyeX).^2 + (eyeY).^2);
+                        Vtrial = eyeDist(:) < 5; % central 5 degrees
                         
                     case 'centralYes'
                         xUL_ = bsxfun(@minus, xUL, eyeX);
@@ -259,8 +278,8 @@ classdef squareFlash < handle
                         xLR_ = bsxfun(@minus, xLR, eyeX);
                         yLR_ = bsxfun(@minus, yLR, eyeY);
                         
-                        eyeDist = sqrt( (eyeX - h.display.ctr(1)).^2 + (eyeY - h.display.ctr(2)).^2);
-                        Vtrial = eyeDist(:) < 6*h.display.ppd;
+                        eyeDist = sqrt( (eyeX).^2 + (eyeY).^2);
+                        Vtrial = eyeDist(:) < 6;
                         
                 end
                 
@@ -268,32 +287,8 @@ classdef squareFlash < handle
                 % right
                 yUL_ = -yUL_;
                 yLR_ = -yLR_;
-                
-%                 figure(1); clf
-%                 plot(xx(:), yy(:), '.k'); hold on
-%                 for iSquare = 1:size(xUL_,2)
-%                     for iFrame = 1:size(xUL_,1)
-%                         plot([xUL_(iFrame,iSquare) xLR_(iFrame,iSquare)], [yUL_(iFrame,iSquare) yLR_(iFrame,iSquare)], '-'); hold on
-%                     end
-%                 end
-%                 
-% %                 figure(2); clf
-%                 tmp2 = zeros(size(xx));
-%                 for iSquare = 1:size(xUL_,2)
-%                     for iFrame = 1:size(xUL_,1)
-%                         tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
-%                             & (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
-%                             
-% %                          tmp =    (yUL_(iFrame,iSquare) >= yy) & (yLR_(iFrame,iSquare) <= yy);
-%                         tmp2 = tmp2 + tmp;
-%                 
-%                     end
-%                 end
-%                 imagesc(tmp2)
-%                 drawnow
-                
-%                 
-                
+                               
+                % loop over squares and recreate binned stimulus
                 for iSquare = 1:size(xUL_,2)
                     for iFrame = 1:size(xUL_,1)
                         tmp = (xUL_(iFrame,iSquare) <= xx) & (xLR_(iFrame,iSquare) >= xx) ...
@@ -302,12 +297,12 @@ classdef squareFlash < handle
                     end
                 end
 %                 
-                figure(1); clf
-                subplot(1,2,1)
-                imagesc(reshape(sum(Xtrial), sz))
-                subplot(1,2,2)
-                imagesc(Xtrial)
-                drawnow
+%                 figure(1); clf
+%                 subplot(1,2,1)
+%                 imagesc(reshape(sum(Xtrial), sz))
+%                 subplot(1,2,2)
+%                 imagesc(Xtrial)
+%                 drawnow
                 
 %                 % ignore values that are outside the window
 %                 off = (x_ < winx(1) | x_ > winx(2)) | (y_ < winy(1) | y_ > winy(2));
@@ -352,8 +347,8 @@ classdef squareFlash < handle
             S.valid = valid;
             S.bins = flipTimes(:);
             S.size = sz;
-            S.xax  = (1:sz(2)) * binSize / ppd + winx(1)/ppd;
-            S.yax  = (1:sz(1)) * binSize / ppd + winy(1)/ppd;
+            S.xax  = (1:sz(2)) * binSize + winx(1);
+            S.yax  = (1:sz(1)) * binSize + winy(1);
             
         end
         
@@ -819,8 +814,18 @@ classdef squareFlash < handle
             for iTrial = 1:numel(trial)
                 nSquares = size(trial(iTrial).pos,2);
                 for iSquare = 1:nSquares
+                    
+                    % get position in pixels
                     pospx = squeeze(trial(iTrial).pos(1:4,iSquare,:));
+                    
+                    % subtract the center of the screen
                     pospx = bsxfun(@minus, pospx, display.ctr');
+                    
+                    % flip y pos so up is positive
+                    pospx(2,:) = -pospx(2,:);
+                    pospx(4,:) = -pospx(4,:);
+                    
+                    % convert to degrees
                     trial(iTrial).pos(1:2,iSquare,:) = pds.px2deg(pospx(1:2,:), display.viewdist, display.px2w);
                     trial(iTrial).pos(3:4,iSquare,:) = pds.px2deg(pospx(3:4,:), display.viewdist, display.px2w);
                 end
@@ -875,45 +880,25 @@ classdef squareFlash < handle
                 if size(trial(kTrial).pos, 3) ~= numel(trial(kTrial).frameTimes)
                     keyboard
                 end
-                eyepos = io.getEyePosition(PDS, thisTrial);
                 
-                trial(kTrial).eyeSampleTime = eyepos(:,1);
-                trial(kTrial).eyeXPx        = eyepos(:,2);
-                trial(kTrial).eyeYPx        = eyepos(:,3);
-                trial(kTrial).pupilArea     = eyepos(:,4);
-                
-                % --- additional eye position analyses
-                %                     results = pdsa.detectSaccades(eyepos(:,1)', eyepos(:,2:3)'./ppd, 'verbose', false);
-                
-                
-                
-                iix = trial(kTrial).eyeXPx < 200 | trial(kTrial).eyeXPx > 1800;
-                iiy = trial(kTrial).eyeYPx < 100 | trial(kTrial).eyeXPx > 1000;
-                bad = iix | iiy;
-                
-                trial(kTrial).eyeXPx(bad) = nan;
-                trial(kTrial).eyeYPx(bad) = nan;
-                trial(kTrial).pupilArea(bad) = nan;
-                
-%                 % find eye position on each frame
-%                 t = trial(kTrial).frameTimes - trial(kTrial).start;
-%                 tdiff = abs(bsxfun(@minus, trial(kTrial).eyeSampleTime, t(:)')) < mean(diff(trial(kTrial).eyeSampleTime));
-%                 [irow,~] = find(diff(tdiff)==-1);
-                
-                %                     trial(kTrial).saccades = false(size(trial(kTrial).frameTimes));
-                %
-                %                     for iSaccade = 1:size(results,2)
-                %                         ix = t > results(1, iSaccade) & t < results(2,iSaccade);
-                %                         trial(kTrial).saccades(ix) = true;
-                %                     end
-                
-                trial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame';
+                % Eye position at the frame time
+                nFrames = numel(trial(kTrial).frameTimes);
+                trial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame(:,1:nFrames)';
                 
                 iix = trial(kTrial).eyePosAtFrame(:,1) < 200 | trial(kTrial).eyePosAtFrame(:,1) > 1800;
                 iiy = trial(kTrial).eyePosAtFrame(:,2) < 100 | trial(kTrial).eyePosAtFrame(:,2) > 1000;
                 bad = iix | iiy;
                 
                 trial(kTrial).eyePosAtFrame(bad,:) = nan;
+                
+                % subtract the center of the screen
+                pospx = bsxfun(@minus, trial(kTrial).eyePosAtFrame, display.ctr(1:2));
+                    
+                % flip y pos so up is positive
+                pospx(2,:) = -pospx(2,:);
+                    
+                % convert to degrees
+                trial(kTrial).trial(kTrial).eyePosAtFrame = pds.px2deg(pospx', display.viewdist, display.px2w)';
                 
             end
             

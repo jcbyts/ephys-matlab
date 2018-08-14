@@ -1,4 +1,8 @@
 function addEphysMatlab
+pathto = fileparts(mfilename('fullpath'));
+
+addpath(pathto)
+addpath(fullfile(pathto, 'utils'))
 
 % --- List of paths that are required
 reposDir = 'C:\Users\Jake\Repos';

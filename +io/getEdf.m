@@ -24,11 +24,11 @@ flipX = false;
 flipY = false;
 
 if isa(sess, 'table') % it's meta data -- load the struct
-    if sess.FlipXEye
+    if ~isnan(sess.FlipXEye) && sess.FlipXEye
         flipX = true;
     end
     
-    if sess.FlipYEye
+    if ~isnan(sess.FlipYEye) && sess.FlipYEye
         flipY = true;
     end
     
@@ -208,6 +208,10 @@ for iCalib = 1:numCmChanges
     % center
     eyePxTmp = bsxfun(@minus, eyePxTmp, PDS.initialParametersMerged.display.ctr(1:2)');
     
+    % flip Y so up is positive
+    eyePxTmp(2,:) = -eyePxTmp(2,:);
+    
+    % convert to degrees
     eyeDegTmp = pds.px2deg(eyePxTmp, PDS.initialParametersMerged.display.viewdist, PDS.initialParametersMerged.display.px2w);
     eyeDegTmp(:,offScreen) = nan;
     

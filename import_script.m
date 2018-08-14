@@ -45,7 +45,7 @@ fprintf('phy template-gui params.py\n')
 
 fprintf('Then cd into the directory that represents your data\n')
 
-%% 
+%% Import Kilosort spikes (MAKE SURE TO MANUALLY COPY cluster_groups.csv to the server!!)
 
 meta = io.getExperimentsAnd(); % get all experiments meta data
 
