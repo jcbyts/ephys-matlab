@@ -9,7 +9,7 @@ classdef psaForage < handle
    
    methods
        
-       function o = psaForage(PDS) % constructor
+       function o = psaForage(PDS, varargin) % constructor
            
            if ~iscell(PDS)
                PDS = {PDS};
@@ -107,9 +107,11 @@ classdef psaForage < handle
                
                psaTrial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1));
                psaTrial(kTrial).start      = psaTrial(kTrial).frameTimes(1);
-               psaTrial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - psaTrial(kTrial).start;
+               psaTrial(kTrial).duration   = psaTrial(kTrial).frameTimes(end) - psaTrial(kTrial).start;
                
                fixBehavior = PDS.initialParametersMerged.(stim).fixationBehavior;
+               
+               % --- Use the stimulus object logs to recreate the timing
                
                % fixation point onset
                onsetIndex = PDS.data{thisTrial}.(fixBehavior).hFix.log(1,:)==1;
@@ -125,30 +127,70 @@ classdef psaForage < handle
                
                % final fixation point offset (transition to state 2)
                psaTrial(kTrial).goSignal   = PDS.PTB2OE(PDS.data{thisTrial}.(stim).states.getTxTime(2));
+               
+               % --- Targets
                psaTrial(kTrial).targets    = PDS.data{thisTrial}.(stim).hTargs;
                psaTrial(kTrial).numTargs   = numel(psaTrial(kTrial).targets);
                
+               % --- Loop over targets and track when they came on, off,
+               % position, etc.
+               
+               % preallocate some variables
                nt = max(arrayfun(@(x) size(x.log,2), psaTrial(kTrial).targets));
-               psaTrial(kTrial).targsOn = nan(psaTrial(kTrial).numTargs, nt);
+               psaTrial(kTrial).targsOn  = nan(psaTrial(kTrial).numTargs, nt);
                psaTrial(kTrial).targsOff = nan(psaTrial(kTrial).numTargs, nt);
                
                for iTarg = 1:psaTrial(kTrial).numTargs
+                   
                    if isempty(psaTrial(kTrial).targets(iTarg).log) % target never turned on
                        continue
                    end
+                   
                    nt = size(psaTrial(kTrial).targets(iTarg).log,2);
                    ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 1; 
                    if ~any(ix) % target never turned on
                        continue
                    end
-                   psaTrial(kTrial).targsOn(iTarg, 1:nt) = PDS.PTB2OE(psaTrial(kTrial).targets(1).log(2,ix));
-                   ix = psaTrial(kTrial).targets(1).log(1,:) == 0;
+                   
+                   psaTrial(kTrial).targsOn(iTarg, 1:nt) = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
+                   
+                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 0;
                    if ~any(ix)
                        % target turned off at last frame
                         psaTrial(kTrial).targsOff(iTarg, 1) = PDS.PTB2OE(PDS.data{thisTrial}.(stim).states.getTxTime(PDS.data{thisTrial}.(stim).states.stateId));
                    else
-                        psaTrial(kTrial).targsOff(iTarg, 1:nt)= PDS.PTB2OE(psaTrial(kTrial).targets(1).log(2,ix));
+                        psaTrial(kTrial).targsOff(iTarg, 1:nt)= PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
                    end
+                   
+                    % --- Target position
+                    
+                    % in pixels
+                    xpx = psaTrial(kTrial).targets(iTarg).position(1);
+                    ypx = psaTrial(kTrial).targets(iTarg).position(2);
+                    
+                    % subtract off center of the screen
+                    xpx = xpx - PDS.initialParametersMerged.display.ctr(1);
+                    ypx = ypx - PDS.initialParametersMerged.display.ctr(2);
+                    
+                    % flip Y position so positive is up
+                    ypx = -ypx;
+                    
+                    dxy = pds.px2deg([xpx; ypx], PDS.initialParametersMerged.display.viewdist, PDS.initialParametersMerged.display.px2w);
+                    psaTrial(kTrial).targPosX(iTarg) = dxy(1);
+                    psaTrial(kTrial).targPosY(iTarg) = dxy(2);
+                   
+                    % --- Target features
+                    psaTrial(kTrial).targDirecion(iTarg) = psaTrial(kTrial).targets(iTarg).theta;
+                    
+                    tmp = pds.px2deg(psaTrial(kTrial).targets(iTarg).radius,PDS.initialParametersMerged.display.viewdist, PDS.initialParametersMerged.display.px2w);
+                    psaTrial(kTrial).targRadius(iTarg)   = tmp(1);
+                    
+                    if isa(psaTrial(kTrial).targets(iTarg), 'stimuli.objects.gaborTarget')
+                        psaTrial(kTrial).targSpeed(iTarg) = psaTrial(kTrial).targets(iTarg).tf/psaTrial(kTrial).targets(iTarg).sf;
+                    else
+                        error('Need to implement this for dots')
+                    end
+                   
                end
                
                psaTrial(kTrial).targChosen = PDS.data{thisTrial}.(stim).dotsChosen;
@@ -159,14 +201,7 @@ classdef psaForage < handle
                    psaTrial(kTrial).choiceTime = PDS.PTB2OE(psaTrial(kTrial).targets(psaTrial(kTrial).targChosen).fixlog(2,ix));
                end
                
-               psaTrial(kTrial).targPosX    = arrayfun(@(x) x.position(1) - PDS.initialParametersMerged.display.ctr(1), psaTrial(kTrial).targets)/PDS.initialParametersMerged.display.ppd;
-               psaTrial(kTrial).targPosY    = arrayfun(@(x) x.position(2) - PDS.initialParametersMerged.display.ctr(2), psaTrial(kTrial).targets)/PDS.initialParametersMerged.display.ppd;
-               psaTrial(kTrial).targDirecion = [psaTrial(kTrial).targets.theta];
-               if isa(psaTrial(kTrial).targets(1), 'stimuli.objects.gaborTarget')
-                   psaTrial(kTrial).targSpeed = arrayfun(@(x) x.tf/x.sf, psaTrial(kTrial).targets);
-               else
-                   error('Need to implement this for dots')
-               end
+               
                
                % check if reward conditions changed
                fnames = fieldnames(PDS.conditions{thisTrial}.(stim));
@@ -197,6 +232,8 @@ classdef psaForage < handle
                end
                
                psaTrial(kTrial).isRewarded = PDS.data{thisTrial}.(stim).isRewarded;
+               
+               psaTrial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame';
                    
                 
                % align stimuli that are yoked to the frame to the frame
