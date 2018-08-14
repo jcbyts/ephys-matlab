@@ -12,7 +12,7 @@ if isa(fpath, 'table')
     fpath = fullfile(getpref('EPHYS', 'SERVER_DATA'), fpath.Directory{1});
 end
 
-warning('off')
+warning('off') % suppress warning while loading
 shankDirs = dir(fullfile(fpath, '_shank*'));
 
 if isempty(shankDirs)
@@ -25,11 +25,14 @@ for iShank = 1:numel(shankDirs)
     tmp = loadops_helper(fullfile(fpath, shankDirs(iShank).name));
     ops(iShank) = tmp; %#ok<AGROW>
 end
-warning('on')
+warning('on') % warnings back on
 
 
 function tmp = loadops_helper(fpath)
     tmp = load(fullfile(fpath, 'ops.mat'));
+    % parfor is a special function so matlab doesn't let you load it as a
+    % variable. Correct for this here. In theory we should've called it
+    % something else, but this is what Kilosort uses.
     if isfield(tmp, 'parfor_')
         tmp.parfor = tmp.parfor_;
         tmp = rmfield(tmp, 'parfor_');

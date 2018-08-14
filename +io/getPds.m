@@ -75,6 +75,8 @@ for kPdsFile = 1:nPdsFiles
             end
         end
     end
+    
+    % --- Synchronize the clocks ------------------------------------------
     [OE2PTBfit, ~,PTB2OE, maxreconstructionerror] = io.sync2OeClock(tmp.PDS, evList);
     
     tmp.PDS.PTB2OE    = PTB2OE;
