@@ -23,8 +23,10 @@ ip.addOptional('numWaveforms', 500)
 ip.addOptional('postSpikeBuffer', 40)
 ip.addOptional('preSpikeBuffer', 10)
 ip.addOptional('clusterIds', [])
-ip.addOptional('useMean', false)
+ip.addOptional('useMean', true)
 ip.parse(varargin{:})
+
+assert(exist(ops.fproc, 'file')==2, 'You need to save a high-pass filtered data file first')
 
 if isempty(ip.Results.figure)
     fig = gca;
@@ -48,7 +50,7 @@ end
 cmap = lines;
 
 % open file to read raw data
-fname = ops.fbinary;
+fname = ops.fproc;
 fid   = fopen(fname, 'r');
 buffer = [ops.Nchan ip.Results.postSpikeBuffer+ip.Results.preSpikeBuffer];
 
@@ -67,42 +69,64 @@ for kClust = 1:numel(clustId)
     
     numWaveforms = ip.Results.numWaveforms;
     
-    if ip.Results.useMean
-        wfs = zeros(numWaveforms,numel(xax), numel(sp.xc));
-    end
-    wctr = 1;
-    for i = ss(1:ceil((n/numWaveforms)):n)'
+    if isfield(sp, 'wfs')
+        xax = sp.wftax + kClust*diff(sp.wftax([1 end]));
+        offset = 150*reshape(repmat((1:numel(sp.xc)), numel(xax), 1), [], 1)';
+        wfs = reshape(bsxfun(@plus, sp.wfs(iix,:), offset), sum(iix), numel(xax), numel(sp.xc));
         
-        fseek(fid, (i-10)*2*ops.Nchan, 'bof');
-        data = double(fread(fid, buffer, '*int16'));
-        data = data(chanMap,:)';
-        data = bsxfun(@minus, data, mean(data([1:10 (buffer(2)-10):buffer(2)],:)));
-        if isfield(sp, 'yc')
-            wf = bsxfun(@plus, data*ops.bitVolts, 5*flipud(sp.yc)');
+        if ip.Results.useMean
+            mwf = squeeze(mean(wfs));
+            plot(xax, mwf, 'Color', cmap(kClust,:)); hold on
+            sd  = squeeze(std(wfs));
+            
+            plot(xax, mwf+sd, ':', 'Color', cmap(kClust,:));
+            plot(xax, mwf-sd, ':', 'Color', cmap(kClust,:));
         else
-            wf = data*ops.bitVolts;
+            
+            
+        end
+        
+    else
+        
+        
+        if ip.Results.useMean
+            wfs = zeros(numWaveforms,numel(xax), numel(sp.xc));
+        end
+        
+        wctr = 1;
+        for i = ss(1:ceil((n/numWaveforms)):n)'
+            
+            fseek(fid, (i-10)*2*ops.Nchan, 'bof');
+            data = double(fread(fid, buffer, '*int16'));
+            data = data(chanMap,:)';
+            data = bsxfun(@minus, data, mean(data([1:10 (buffer(2)-10):buffer(2)],:)));
+            if isfield(sp, 'yc')
+                wf = bsxfun(@plus, data*ops.bitVolts, 5*flipud(sp.yc)');
+            else
+                wf = data*ops.bitVolts;
+            end
+            
+            if ip.Results.useMean
+                wfs(wctr,:,:) = wf;
+                wctr = wctr + 1;
+            else
+                plot(xax, wf, 'Color', cmap(kClust,:)); hold on
+            end
         end
         
         if ip.Results.useMean
-            wfs(wctr,:,:) = wf;
-            wctr = wctr + 1;
-        else
-            plot(xax, wf, 'Color', cmap(kClust,:)); hold on
+            mwf = squeeze(mean(wfs));
+            plot(xax, mwf, 'Color', cmap(kClust,:)); hold on
+            
+            %         th = mode(diff(mwf(1,:)))/2;
+            sd  = squeeze(std(wfs));
+            %         sd(sd > th) = nan;
+            plot(xax, mwf+sd, ':', 'Color', cmap(kClust,:));
+            plot(xax, mwf-sd, ':', 'Color', cmap(kClust,:));
         end
-    end
-    
-    if ip.Results.useMean
-        mwf = squeeze(mean(wfs));
-        plot(xax, mwf, 'Color', cmap(kClust,:)); hold on
         
-        %         th = mode(diff(mwf(1,:)))/2;
-%         sd  = squeeze(std(wfs));
-%         sd(sd > th) = nan;
-%         plot(xax, mwf+sd, ':', 'Color', cmap(kClust,:));
-%         plot(xax, mwf-sd, ':', 'Color', cmap(kClust,:));
+        drawnow
     end
-    
-    drawnow
     
 end
 axis tight
