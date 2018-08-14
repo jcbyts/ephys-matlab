@@ -354,11 +354,11 @@ classdef hartleyFF < handle
                 trial(kTrial).phi        = PDS.data{thisTrial}.(stim).phi;
                 trial(kTrial).tf         = PDS.data{thisTrial}.(stim).tf;
                 
-                eyepos = io.getEyePosition(PDS, thisTrial);
-                trial(kTrial).eyeSampleTime = eyepos(:,1);
-                trial(kTrial).eyeXPx        = eyepos(:,2);
-                trial(kTrial).eyeYPx        = eyepos(:,3);
-                trial(kTrial).pupilArea     = eyepos(:,4);
+%                 eyepos = io.getEyePosition(PDS, thisTrial);
+%                 trial(kTrial).eyeSampleTime = eyepos(:,1);
+%                 trial(kTrial).eyeXPx        = eyepos(:,2);
+%                 trial(kTrial).eyeYPx        = eyepos(:,3);
+%                 trial(kTrial).pupilArea     = eyepos(:,4);
                 
                 % --- need to add frozen sequence
                 trial(kTrial).frozenSequence = false;
