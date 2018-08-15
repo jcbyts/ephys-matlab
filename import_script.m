@@ -33,19 +33,9 @@ preprocess.removeArtifactsManual(thisSession);
 %% sort with kilosort
 preprocess.runKiloSort(thisSession, 'merge', true)
 
-%% Ready to run phy? Run this cell and then follow the prompt
 
-commandwindow
-fprintf('Open the START menu and select Anaconda prompt\n')
-
-fprintf('Copy and paste in the following\n')
-
-fprintf('activate phy\n')
-fprintf('phy template-gui params.py\n')
-
-fprintf('Then cd into the directory that represents your data\n')
-
-%% Import Kilosort spikes (MAKE SURE TO MANUALLY COPY cluster_groups.csv to the server!!)
+%% Import Kilosort spikes 
+% (MAKE SURE TO MANUALLY COPY cluster_groups.csv to the server before running this!!)
 
 meta = io.getExperimentsAnd(); % get all experiments meta data
 
