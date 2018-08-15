@@ -206,7 +206,7 @@ classdef hartleyFF < handle
             sta.kys = h.design.kys;
             sta.RF = reshape(sflip*v(:,1), h.design.nkx, h.design.nky);
             sta.time = (1:h.design.nkTime)*h.display.ifi;
-            sta.RFtime = sflip*u(:,1);
+            sta.RFtime = flipud(sflip*u(:,1));
             
         end
         
@@ -363,6 +363,17 @@ classdef hartleyFF < handle
                 % --- need to add frozen sequence
                 trial(kTrial).frozenSequence = false;
                 trial(kTrial).frozenSequenceLength = nan;
+                
+                if isfield(PDS.conditions{kTrial}, stim) && isfield(PDS.conditions{kTrial}.(stim), 'generativeModel')
+                    if strcmp(PDS.conditions{kTrial}.(stim).generativeModel, 'frozen')
+                        trial(kTrial).frozenSequence = true;
+                        trial(kTrial).frozenSequenceLength = PDS.data{kTrial}.(stim).sequenceFrame/4;
+                        
+                        inds = reshape(1:PDS.data{kTrial}.(stim).sequenceFrame, trial(kTrial).frozenSequenceLength, 4);
+                        tmp_ = PDS.data{kTrial}.(stim).sequence.kx(inds);
+                        assert(all(all(bsxfun(@eq, tmp_, tmp_(:,1)))), 'something is wrong with the frozen trial')
+                    end
+                end
                 
                 % --- add face targets
                 if isfield(PDS.data{thisTrial}, 'faceforage')

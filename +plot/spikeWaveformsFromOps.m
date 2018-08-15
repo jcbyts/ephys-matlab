@@ -24,6 +24,7 @@ ip.addOptional('postSpikeBuffer', 40)
 ip.addOptional('preSpikeBuffer', 10)
 ip.addOptional('clusterIds', [])
 ip.addOptional('useMean', true)
+ip.addOptional('yscale', 150)
 ip.parse(varargin{:})
 
 assert(exist(ops.fproc, 'file')==2, 'You need to save a high-pass filtered data file first')
@@ -71,7 +72,7 @@ for kClust = 1:numel(clustId)
     
     if isfield(sp, 'wfs')
         xax = sp.wftax + kClust*diff(sp.wftax([1 end]));
-        offset = 150*reshape(repmat((1:numel(sp.xc)), numel(xax), 1), [], 1)';
+        offset = ip.Results.yscale*reshape(repmat((1:numel(sp.xc)), numel(xax), 1), [], 1)';
         wfs = reshape(bsxfun(@plus, sp.wfs(iix,:), offset), sum(iix), numel(xax), numel(sp.xc));
         
         if ip.Results.useMean
@@ -81,6 +82,7 @@ for kClust = 1:numel(clustId)
             
             plot(xax, mwf+sd, ':', 'Color', cmap(kClust,:));
             plot(xax, mwf-sd, ':', 'Color', cmap(kClust,:));
+            text(xax(2), max(mwf(:) + sd(:)) + ip.Results.yscale/2, sprintf('unit: %d', kClust), 'Color', cmap(kClust,:))
         else
             
             

@@ -61,7 +61,7 @@ classdef psaForage < handle
                 
                 if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
                     
-                    if pdsDate > datenum(2018, 08, 15)
+                    if pdsDate > datenum(2018, 12, 12)
                         trial = session.psaForage.importPDS_v2(PDS);
                     elseif pdsDate > datenum(2018, 02, 01)
                         trial = session.psaForage.importPDS_v1(PDS);
@@ -142,26 +142,6 @@ classdef psaForage < handle
                
                for iTarg = 1:psaTrial(kTrial).numTargs
                    
-                   if isempty(psaTrial(kTrial).targets(iTarg).log) % target never turned on
-                       continue
-                   end
-                   
-                   nt = size(psaTrial(kTrial).targets(iTarg).log,2);
-                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 1; 
-                   if ~any(ix) % target never turned on
-                       continue
-                   end
-                   
-                   psaTrial(kTrial).targsOn(iTarg, 1:nt) = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
-                   
-                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 0;
-                   if ~any(ix)
-                       % target turned off at last frame
-                        psaTrial(kTrial).targsOff(iTarg, 1) = PDS.PTB2OE(PDS.data{thisTrial}.(stim).states.getTxTime(PDS.data{thisTrial}.(stim).states.stateId));
-                   else
-                        psaTrial(kTrial).targsOff(iTarg, 1:nt)= PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
-                   end
-                   
                     % --- Target position
                     
                     % in pixels
@@ -180,7 +160,7 @@ classdef psaForage < handle
                     psaTrial(kTrial).targPosY(iTarg) = dxy(2);
                    
                     % --- Target features
-                    psaTrial(kTrial).targDirecion(iTarg) = psaTrial(kTrial).targets(iTarg).theta;
+                    psaTrial(kTrial).targDirection(iTarg) = psaTrial(kTrial).targets(iTarg).theta;
                     
                     tmp = pds.px2deg(psaTrial(kTrial).targets(iTarg).radius,PDS.initialParametersMerged.display.viewdist, PDS.initialParametersMerged.display.px2w);
                     psaTrial(kTrial).targRadius(iTarg)   = tmp(1);
@@ -190,6 +170,49 @@ classdef psaForage < handle
                     else
                         error('Need to implement this for dots')
                     end
+                    
+                    % --- Timings
+                    
+                    % initialize with nan
+                    psaTrial(kTrial).targsOn(iTarg,1) = nan;
+                    psaTrial(kTrial).targsOff(iTarg,1) = nan;
+                    
+                    
+                   % --- Log Target Onset
+                   if isempty(psaTrial(kTrial).targets(iTarg).log) % target never turned on
+                       continue
+                   end
+                   
+                   
+                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 1; 
+                   if ~any(ix) % target never turned on
+                       continue
+                   end
+                   
+                   targon = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
+                   nt = numel(targon);
+                   if  nt > 1 % target turned on more than once?
+                       % check if it was logged twice within a frame
+                       if diff(targon) < PDS.initialParametersMerged.display.ifi
+                           nt = 1;
+                       end
+                   end
+                   psaTrial(kTrial).targsOn(iTarg, 1:nt) = targon(1:nt);
+                   
+                   % --- Log Target Offset
+                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 0;
+                   if ~any(ix)
+                       % target turned off at last frame
+                        psaTrial(kTrial).targsOff(iTarg, 1) = PDS.PTB2OE(PDS.data{thisTrial}.(stim).states.getTxTime(PDS.data{thisTrial}.(stim).states.stateId));
+                   else
+                       targoff = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
+                       if numel(targoff) > 1 % why did it turn off twice
+                           assert(diff(targoff) < PDS.initialParametersMerged.display.ifi, 'Target turned off twice. What is up?')
+                       end
+                       
+                       psaTrial(kTrial).targsOff(iTarg, 1:nt)= targoff(1:nt);
+                   end
+                   
                    
                end
                
@@ -235,7 +258,15 @@ classdef psaForage < handle
                
                psaTrial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame';
                    
-                
+               % center
+               psaTrial(kTrial).eyePosAtFrame = bsxfun(@minus, psaTrial(kTrial).eyePosAtFrame, PDS.initialParametersMerged.display.ctr(1:2));
+               
+               % flip Y
+               psaTrial(kTrial).eyePosAtFrame(:,2) = -psaTrial(kTrial).eyePosAtFrame(:,2);
+               
+               % pixels 2 degrees
+               psaTrial(kTrial).eyePosAtFrame = pds.px2deg(psaTrial(kTrial).eyePosAtFrame', PDS.initialParametersMerged.display.viewdist, PDS.initialParametersMerged.display.px2w)';
+               
                % align stimuli that are yoked to the frame to the frame
                % rate
 %                psaTrial(kTrial).fixOn = session.psaForage.alignToNextFrame(psaTrial(kTrial).fixOn, psaTrial(kTrial).frameTimes);

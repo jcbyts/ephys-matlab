@@ -134,6 +134,22 @@ classdef squareFlash < handle
             
         end % constructor
         
+        function spks = binSpikes(h, stim, sp, units)
+        % spks = binSpikes(h, stim, sp, units)
+            T = size(stim.X,1);
+            spks = zeros(T,1);
+            if nargin < 4
+                units = sp.cids(sp.cgs >= 1);
+            end
+            
+            nUnits = numel(units);
+            for i = 1:nUnits
+                cnt = histc(sp.st(sp.clu == units(i)), stim.bins);
+                cnt((diff(stim.bins) > (h.display.ifi*1.5))) = 0;
+                spks(:,i) = cnt;
+            end
+            
+        end % binSpikes
         
         function plotTrial(h, kTrial)
             
@@ -152,7 +168,7 @@ classdef squareFlash < handle
             plot3(h.trial(kTrial).frameTimes-h.trial(kTrial).start, h.trial(kTrial).eyePosAtFrame(:,1), h.trial(kTrial).eyePosAtFrame(:,2), '.');
             
             
-        end
+        end % plotTrial
         
         function S = binSpace(h, varargin)
             % binSpace bins the stimulus at a specified resolution
@@ -243,11 +259,7 @@ classdef squareFlash < handle
                 yLR = squeeze(h.trial(kTrial).pos(4,:,:))';
                 
                 % eye position at frame flip (in pixels)
-                eyeX = h.trial(kTrial).eyePosAtFrame(:,1);
-                
-%                 % flip X position
-%                 eyeX = -1*(h.trial(kTrial).eyePosAtFrame(:,1) - h.display.ctr(1)) + h.display.ctr(1);
-                
+                eyeX = h.trial(kTrial).eyePosAtFrame(:,1);                
                 eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
                 
                 switch ip.Results.correctEyePos
@@ -285,8 +297,8 @@ classdef squareFlash < handle
                 
                 % flip y, because pixels count from top left to bottom
                 % right
-                yUL_ = -yUL_;
-                yLR_ = -yLR_;
+%                 yUL_ = -yUL_;
+%                 yLR_ = -yLR_;
                                
                 % loop over squares and recreate binned stimulus
                 for iSquare = 1:size(xUL_,2)
@@ -883,8 +895,11 @@ classdef squareFlash < handle
                 
                 % Eye position at the frame time
                 nFrames = numel(trial(kTrial).frameTimes);
+                
+                % Eye position in pixels
                 trial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame(:,1:nFrames)';
                 
+                % Exclude edges of the screen
                 iix = trial(kTrial).eyePosAtFrame(:,1) < 200 | trial(kTrial).eyePosAtFrame(:,1) > 1800;
                 iiy = trial(kTrial).eyePosAtFrame(:,2) < 100 | trial(kTrial).eyePosAtFrame(:,2) > 1000;
                 bad = iix | iiy;
@@ -895,7 +910,7 @@ classdef squareFlash < handle
                 pospx = bsxfun(@minus, trial(kTrial).eyePosAtFrame, display.ctr(1:2));
                     
                 % flip y pos so up is positive
-                pospx(2,:) = -pospx(2,:);
+                pospx(:,2) = -pospx(:,2);
                     
                 % convert to degrees
                 trial(kTrial).trial(kTrial).eyePosAtFrame = pds.px2deg(pospx', display.viewdist, display.px2w)';

@@ -2,7 +2,7 @@
 Matlab tools for electrophysiology experiments collected with [PLDAPS](https://github.com/huklab/PLDAPS/tree/openreception) and [Open-Ephys](https://github.com/open-ephys/plugin-GUI)
 
 ### General idea:
-ephys-matlab provides a set of tools for essential components of all visual neuroscience experiments:
+ephys-matlab provides a set of tools for essential components of visual neuroscience experiments:
  1. importing 
  	* synchronizing visual stimuli, behavior, and electrophysiology
  	* convert from different file-types
@@ -17,6 +17,31 @@ ephys-matlab provides a set of tools for essential components of all visual neur
 caveats: This is a work in progress and will gain new features as they become necessary. This package will not be supported for public consumption.
 
 PLDAPS manages stimulus presentation and behavioral monitoring. Open-Ephys 
+
+## Meta Data
+A central component of ephys-matlab is the use of meta data for tracking what experiments / analyses have been run. In many ways, we use this as if we had a database, but it is not one!! It is just an excel file that keeps track of the
+
+###Automagically tracked features
+* Date
+* Subject
+* Directory
+* Time
+* Tag
+* oe2dat
+* StimulusProtocols
+* SpikeSorting
+* LFpPhaseCorrection
+
+###Manually tracked features
+* Weight
+* Chamber
+* Rig
+* Electrode
+* Lens
+* FlipXEye
+* FlipYEye
+
+
 
 ## Importing a session
 The file `import_script.m` provides a template for importing an ephys session collected with PLDAPS / Open-Ephys / Eyelink

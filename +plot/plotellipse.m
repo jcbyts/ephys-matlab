@@ -1,4 +1,4 @@
-function [h,el] = plotellipse(mu, covmat, r, varargin);
+function [h,el] = plotellipse(mu, covmat, r, varargin)
 % h = plotellipse(mu, covmat, stdev, varargin);
 %
 % Plots an ellipse of constant probability (i.e. a contour of
