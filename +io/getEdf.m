@@ -208,9 +208,6 @@ for iCalib = 1:numCmChanges
     % center
     eyePxTmp = bsxfun(@minus, eyePxTmp, PDS.initialParametersMerged.display.ctr(1:2)');
     
-    % flip Y so up is positive
-    eyePxTmp(2,:) = -eyePxTmp(2,:);
-    
     % convert to degrees
     eyeDegTmp = pds.px2deg(eyePxTmp, PDS.initialParametersMerged.display.viewdist, PDS.initialParametersMerged.display.px2w);
     eyeDegTmp(:,offScreen) = nan;
@@ -228,6 +225,7 @@ tmp = min(tmp);
 
 info.bitDeg = [1/100 tmp];
 
+% flip Y so up is positive
 eyeXyDeg(:,2) = eyeXyDeg(:,2)*-1;
 
 data = [int16((eyeXyDeg - tmp)*100) el.FSAMPLE.pa(eyeIdx,:)'];
