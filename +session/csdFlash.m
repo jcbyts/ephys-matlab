@@ -67,7 +67,7 @@ classdef csdFlash < handle
             pdsDate = PDS.initialParametersMerged.session.initTime;
             
             if pdsDate > datenum(2018,02,01)
-                trial = [];
+                trial = session.csdFlash.importPDS_v2(PDS);
             else
                 trial = session.csdFlash.importPDS_v1(PDS);
             end
@@ -93,8 +93,20 @@ classdef csdFlash < handle
                 csdTrial(kTrial).start      = csdTrial(kTrial).frameTimes(1);
                 csdTrial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - csdTrial(kTrial).start;
                 
-                csdTrial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
-                csdTrial(kTrial).onset      = csdTrial(kTrial).frameTimes(diff(csdTrial(kTrial).on)==1);
+                if isempty(PDS.data{thisTrial}.(stim).hFlash.log)
+                    csdTrial(kTrial).onset = [];
+                    csdTrial(kTrial).offset = [];
+                    continue
+                end
+                
+                onIx = PDS.data{thisTrial}.(stim).hFlash.log(1,:)==1;
+                offIx = PDS.data{thisTrial}.(stim).hFlash.log(1,:)==0;
+                offIx(1) = false;
+%                 csdTrial(kTrial).on         = PDS.data{thisTrial}.(stim).on;
+                
+                % TODO: Align to frame onset
+                csdTrial(kTrial).onset      = PDS.PTB2OE(PDS.data{thisTrial}.(stim).hFlash.log(2,onIx));
+                csdTrial(kTrial).offset     = PDS.PTB2OE(PDS.data{thisTrial}.(stim).hFlash.log(2,offIx));
             end
             
             
