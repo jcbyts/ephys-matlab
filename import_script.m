@@ -31,6 +31,7 @@ thisSession = io.importStimulusProtocols(thisSession);
 preprocess.removeArtifactsManual(thisSession);
 
 %% sort with kilosort
+
 preprocess.runKiloSort(thisSession, 'merge', true)
 
 
