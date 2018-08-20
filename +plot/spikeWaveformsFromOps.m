@@ -27,8 +27,14 @@ ip.addOptional('useMean', true)
 ip.addOptional('yscale', 150)
 ip.parse(varargin{:})
 
-assert(exist(ops.fproc, 'file')==2, 'You need to save a high-pass filtered data file first')
+useMean = ip.Results.useMean;
 
+if ~exist(ops.fproc, 'file')
+    warning('spikeWaveformsFromOps: No high-pass filtered data. Using wideband')
+    ops.fproc = ops.fbinary; % point to wideband data instead
+    useMean = false;
+end
+    
 if isempty(ip.Results.figure)
     fig = gca;
 else
@@ -75,7 +81,7 @@ for kClust = 1:numel(clustId)
         offset = ip.Results.yscale*reshape(repmat((1:numel(sp.xc)), numel(xax), 1), [], 1)';
         wfs = reshape(bsxfun(@plus, sp.wfs(iix,:), offset), sum(iix), numel(xax), numel(sp.xc));
         
-        if ip.Results.useMean
+        if useMean
             mwf = squeeze(mean(wfs));
             plot(xax, mwf, 'Color', cmap(kClust,:)); hold on
             sd  = squeeze(std(wfs));
@@ -91,7 +97,7 @@ for kClust = 1:numel(clustId)
     else
         
         
-        if ip.Results.useMean
+        if useMean
             wfs = zeros(numWaveforms,numel(xax), numel(sp.xc));
         end
         
@@ -108,7 +114,7 @@ for kClust = 1:numel(clustId)
                 wf = data*ops.bitVolts;
             end
             
-            if ip.Results.useMean
+            if useMean
                 wfs(wctr,:,:) = wf;
                 wctr = wctr + 1;
             else
@@ -116,7 +122,7 @@ for kClust = 1:numel(clustId)
             end
         end
         
-        if ip.Results.useMean
+        if useMean
             mwf = squeeze(mean(wfs));
             plot(xax, mwf, 'Color', cmap(kClust,:)); hold on
             
