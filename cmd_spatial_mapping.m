@@ -3,29 +3,40 @@
 meta = io.getExperimentsAnd(); % get all experiments meta data
 
 %thisSession = meta(148,:); % again grab the session you are working with
-thisSession = meta(end-3,:);
+thisSession = meta(end-2,:);
 disp(thisSession)
 
+fprintf('Loading Behavioral data from the server...')
+tic
 PDS = io.getPds(thisSession);
+fprintf(' [%02.2f]\n', toc)
 
+fprintf('Loading Spiking data from the server...')
+tic
 sp = io.getSpikes(thisSession, 'Kilo');
+fprintf(' [%02.2f]\n', toc)
 
 %% plot spike waveforms
 ops = io.loadOps(thisSession);
 
-figure(1); clf
 nShanks = numel(ops);
 
 for iShank = 1:nShanks
-    figure(iShank); clf
+    fig(iShank) = figure(iShank+100); clf
+    fig(iShank).Position = [1 1 floor((8.5/11)*1080) 1080];
+    
+    axes('Position', [.05 .6 .4 .35])
+    
     if isfield(sp{iShank}, 'uQ')
         [~, ind] = sort(sp{iShank}.clusterDepths);
         clusterIds = sp{iShank}.cids(ind);
     else
         clusterIds = [];
     end
-    fig(iShank) = plot.spikeWaveformsFromOps(ops(iShank), sp{iShank}, 'figure', iShank, 'clusterIds', clusterIds, 'numWaveforms', 100);
+    fig(iShank) = plot.spikeWaveformsFromOps(ops(iShank), sp{iShank}, 'figure',  fig(iShank), 'clusterIds', clusterIds, 'numWaveforms', 100, 'yscale', 50);
+    axis off
 end
+
 
 
 
@@ -35,8 +46,8 @@ end
 % might want to score enough of them to know that we trust the algorithm.
 
 % load Eye position
-[data, timestamps, elInfo] = io.getEdf(thisSession);
-% data(2,:) = -data(2,:);
+[data, timestamps, elInfo] = io.getEdf(thisSession, PDS, false);
+
 % --- remove bad samples
 ix = any(data(1:2,:) == elInfo.bitDeg(2));
 data(1,ix) = nan;
@@ -50,7 +61,7 @@ ix = ~any(isnan(data));
     'filterLength', ceil(20/elInfo.sampleRate*1e3), ... % 40 ms smoothing for velocity computation
     'detectThresh', 200, ...
     'startThresh', 5, ...
-    'minIsi', ceil(50/elInfo.sampleRate*1e3), ...
+    'minIsi', ceil(25/elInfo.sampleRate*1e3), ...
     'minDur', ceil(4/elInfo.sampleRate*1e3), ... % 4 ms
     'blinkIsi', ceil(40/elInfo.sampleRate*1e3));
 
@@ -76,38 +87,57 @@ xlabel('duration (s)')
 ylabel('amplitude (deg)')
 
 figure(3); clf
+subplot(1,2,1)
+
+% saccade vectors
 dx = saccades.endXpos - saccades.startXpos;
 dy = saccades.endYpos - saccades.startYpos;
 
-[cnt, bins] = hist3([dx(:) dy(:)], [40 40]);
+[cnt, binEdges] = hist3([dx(:) dy(:)], [40 40]);
 
-imagesc(bins{1}, bins{2}, cnt)
+binCenters{1} = binEdges{1}+mean(diff(binEdges{1})/2);
+binCenters{2} = binEdges{2}+mean(diff(binEdges{2})/2);
+
+imagesc(binCenters{1}, binCenters{2}, log(cnt))
+title('Saccade Vectors', 'FontWeight', 'normal')
+xlabel('Degrees')
+ylabel('Degrees')
 axis xy
 
 
-[cnt, bins] = hist3([data(2,:)', data(1,:)'], [400 400]);
+[cnt, binEdges] = hist3([data(2,:)', data(1,:)'], [400 400]);
+binCenters{1} = binEdges{1}+mean(diff(binEdges{1})/2);
+binCenters{2} = binEdges{2}+mean(diff(binEdges{2})/2);
 
-figure(3); clf
-imagesc(bins{1}, bins{2}, log(cnt))
+subplot(1,2,2)
+imagesc(binCenters{1}, binCenters{2}, log(cnt))
+title('Eye Position', 'FontWeight', 'normal')
+xlabel('Degrees')
+ylabel('Degrees')
 axis xy
 
-hold on 
-% plot(data(1,:), data(2,:), '.r')
+%%
+figure(20); clf
+imagesc(binCenters{1}, binCenters{2}, (cnt))
+axis xy
+grid on
+set(gca, 'GridColor', 'r', 'GridAlpha', 1)
+
+
 %% build stimulus object
 spatialMap = session.squareFlash(PDS, 'eyetrace', [timestamps'; data], 'saccades', saccades);
 
 %% bin space and create the design matrix
 %x,y,x,y
-window  = [0 -10 20 0]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
+psthWindow  = [0 -20 40 20]; %[-3, 3]% degrees (window is the same in x and y -- TODO: separate)
 binSize = 1; % degrees
 
-stim = spatialMap.binSpace('window', window, 'binSize', binSize, 'correctEyePos', 'simple');
-stimBase = spatialMap.binSpace('window', window, 'binSize', binSize, 'correctEyePos', 'no');
+stim = spatialMap.binSpace('window', psthWindow, 'binSize', binSize, 'correctEyePos', 'simple');
 
 %% Bin up spike counts
 T = size(stim.X,1);
 spks = zeros(T,1);
-clusterIds = sp{1}.cids(sp{1}.cgs >=2);
+% clusterIds = sp{1}.cids(sp{1}.cgs >=2);
 units = clusterIds;
 % [~, inds] = sort(sp{1}.clusterDepths);
 % units = sp{1}.cids(inds);
@@ -118,14 +148,24 @@ for i = 1:nUnits
     spks(:,i) = cnt;
 end
 
+figure(3); clf
+subplot(4,2,1:2)
+imagesc(stim.X(stim.valid,:)')
+title('Stimulus')
+subplot(4,2,3:4)
+imagesc(filter(ones(100,1)/100, 1, spks(stim.valid,:))')
+title('Spikes')
+subplot(2,2,3)
+imagesc(cov(spks))
+subplot(2,2,4)
+errorbar(sum(spks), var(spks), 'o')
+
 %% Quick check to make sure the mapping is working
-
+% stim = stimBase;
 % fit spatial RFs
-temporal_lags = 1:5;
-baseLambda = 10;
-[RFcorr, dcCorr, rfCorr_params] = rfmap.spatialRfAutoSmooth(stim.X(stim.valid,:), spks(stim.valid,:), temporal_lags, stim.size, 'crossvalidation', false, 'lambda0', baseLambda);
-
-[RFbase, dcBase, rfBase_params] = rfmap.spatialRfAutoSmooth(stimBase.X(stimBase.valid,:), spks(stimBase.valid,:), temporal_lags, stimBase.size, 'crossvalidation', false, 'lambda0', baseLambda);
+temporal_lags = 1:8;
+baseLambda = 100;
+RFcorr = rfmap.spatialRfAutoSmooth(stim.X(stim.valid,:), spks(stim.valid,:), temporal_lags, stim.size, 'crossvalidation', false, 'lambda0', baseLambda);
 
 I = RFcorr;
 figure(1); clf
@@ -147,6 +187,9 @@ end
 %% Fit with and without eye correction with cross validation for hyper parameter
 baseLambda = 10;
 [RFcorr, dcCorr, rfCorr_params] = rfmap.spatialRfAutoSmooth(stim.X(stim.valid,:), spks(stim.valid,:), temporal_lags, stim.size, 'crossvalidation', true, 'lambda0', baseLambda);
+
+% uncorrected
+stimBase = spatialMap.binSpace('window', psthWindow, 'binSize', binSize, 'correctEyePos', 'no');
 [RFbase, dcBase, rfBase_params] = rfmap.spatialRfAutoSmooth(stimBase.X(stimBase.valid,:), spks(stimBase.valid,:), temporal_lags, stimBase.size, 'crossvalidation', true, 'lambda0', baseLambda*1000);
 
 % fit 2D gabors and gaussians to the corrected RFs
@@ -156,10 +199,10 @@ results = rfmap.fitParametric2dRf(stim, RFcorr);
 fits = {RFcorr, RFbase};
 for iFit = 1:numel(fits)
     I = fits{iFit};
-    figure(iFit); clf
+    figure(iShank + 100 + (iFit-1));
     sx = ceil(sqrt(nUnits));
     sy = round(sqrt(nUnits));
-    ax = pdsa.tight_subplot(sx, sy, .05, .01);
+    ax = pdsa.tight_subplot(sx, sy, .05, [.65 .05], [.5 .01]);
     if isfield(rfCorr_params, 'fold_r2')
         r2_test = mean(rfCorr_params.fold_r2);
     else
@@ -168,45 +211,262 @@ for iFit = 1:numel(fits)
     
     for i = 1:(sx*sy)
         set(gcf, 'currentaxes', ax(i))
-        if i <= nUnits && r2_test(i) > .01
+        if i <= nUnits
             imagesc(stim.xax, stim.yax, reshape(I(:,i), stim.size)); colormap gray
             set(ax(i), 'gridcolor', 'y')
             grid on
             axis xy
-            
             hold on
-            xy = [results(i).gaussian.means.x0, results(i).gaussian.means.y0];
-            plotellipse(xy, [results(i).gaussian.means.sigmax 0; 0 results(i).gaussian.means.sigmay], 1, 'r')
+            text(mean(stim.xax), .8*max(stim.yax), sprintf('Unit: %d', i), 'Color', cmap(i,:))
+            if  r2_test(i) > .01
+                
+                xy = [results(i).gaussian.means.x0, results(i).gaussian.means.y0];
+                plot.plotellipse(xy, [results(i).gaussian.means.sigmax 0; 0 results(i).gaussian.means.sigmay], 1, 'Color', cmap(i,:), 'Linewidth', 2)
+            end
         else
             set(ax(i), 'Visible', 'off')
         end
     end
 end
+
+%% check that the eye traces align
+
+psa = session.psaForage(PDS);
+
+
+%% add spikes to trial
+
+targ1On = arrayfun(@(x) x.targsOn(1), psa.trial);
+goodTrial = find(~isnan(targ1On));
+
+% bin at ms resolution
+binfun = @(x) (x==0) + ceil(x/1e-3);
+
+clear trial
+trial = repmat(struct(), numel(goodTrial),1);
+for kTrial = 1:numel(goodTrial)
+    thisTrial = goodTrial(kTrial);
     
+    trial(kTrial).start = psa.trial(thisTrial).start;
+    trial(kTrial).duration = (psa.trial(thisTrial).duration);
+    
+    trial(kTrial).targ1On = binfun(psa.trial(thisTrial).targsOn(1) - trial(kTrial).start);
+    trial(kTrial).targ1Off = binfun(psa.trial(thisTrial).targsOff(1) - trial(kTrial).start);
+    trial(kTrial).targ1Dir = psa.trial(thisTrial).targDirection(1);
+    
+    trial(kTrial).targ2On = binfun(psa.trial(thisTrial).targsOn(2) - trial(kTrial).start);
+    trial(kTrial).targ2Off = binfun(psa.trial(thisTrial).targsOff(2) - trial(kTrial).start);
+    trial(kTrial).targ2Dir = psa.trial(thisTrial).targDirection(2);
+    
+    trial(kTrial).choice = psa.trial(thisTrial).targChosen;
+    trial(kTrial).choiceTime = binfun(psa.trial(thisTrial).choiceTime - trial(kTrial).start);
+    
+    for kUnit = 1:nUnits
+        st = sp{iShank}.st(sp{iShank}.clu == clusterIds(kUnit));
+        st = st - trial(kTrial).start;
+        trial(kTrial).(sprintf('sptrain%02.0f', kUnit)) = binfun(st(st > 0 & st < trial(kTrial).duration));
+    end
+    
+    trial(kTrial).start = binfun(trial(kTrial).start);
+    trial(kTrial).duration = binfun(psa.trial(thisTrial).duration);
+end
+
+t0 = trial(1).start;
+for kTrial = 1:numel(trial)
+    trial(kTrial).start = trial(kTrial).start - t0;
+end
+
+%%    
+trial(4)
+save('sample_trial.mat', '-v7.3', 'trial')
+
+% trial = 
+%%
+
+
+iix = timestamps > psa.trial(1).start & timestamps < psa.trial(end).start;
+
+[cnt, binCenters] = hist3([data(2,iix)', data(1,iix)'], [400 400]);
+% binCenters{1} = binEdges{1}+mean(diff(binEdges{1})/2);
+% binCenters{2} = binEdges{2}+mean(diff(binEdges{2})/2);
+
+figure(iShank + 100);
+axes('Position', [.05 .35 .25 .2])
+imagesc(binCenters{2}, binCenters{1}, log(cnt)); colormap gray
+hold on
+title('Eye Position', 'FontWeight', 'normal')
+xlabel('Degrees')
+ylabel('Degrees')
+axis xy
+grid on
+set(gca, 'GridColor', 'y', 'GridAlpha', .25)
+
+% for kTrial = 1:psa.numTrials
+%     plot(psa.trial(kTrial).eyePosAtFrame(:,1), psa.trial(kTrial).eyePosAtFrame(:,2), '.'); hold on
+% end
+
+numTargs = max(arrayfun(@(x) numel(x.targets), psa.trial));
+cmap = lines;
+for kUnit = 1:nUnits
+	if r2_test(kUnit) < .01
+        continue
+    end
+    
+    xy = [results(kUnit).gaussian.means.x0, results(kUnit).gaussian.means.y0];
+    plot.plotellipse(xy, [results(kUnit).gaussian.means.sigmax 0; 0 results(kUnit).gaussian.means.sigmay], 1, 'Color', cmap(kUnit,:), 'Linewidth', 2); hold on
+end
+    
+targX = cell2mat(arrayfun(@(x) x.targPosX, psa.trial, 'uni', false));
+targY = cell2mat(arrayfun(@(x) x.targPosY, psa.trial, 'uni', false));
+
+cTarg = hsv(2);
+for kTarg = 1:numTargs
+    plot(targX(:,kTarg), targY(:,kTarg), 'o', 'Color', 'k', 'MarkerFaceColor', cTarg(kTarg,:))
+end
+    
+plot(0, 0, 'or')
+grid on
+xlim([-15 15])
+ylim([-10 10])
+xlabel('Degrees')
+ylabel('Degrees')
+% title('RFs / Task')
+
+
+targ1On = arrayfun(@(x) x.targsOn(1), psa.trial);
+goodTrial = ~isnan(targ1On);
+spikeCount = zeros(sum(goodTrial), nUnits);
+
+countingWindow = .2;
+psthWindow = [-.2 1]; % centered on the event
+binSize = .01;
+smoothingKernel = ones(1,3)/3; % boxcar
+
+axes('Position', [.35 .35 .3 .2])
+for kUnit = 1:nUnits
+    if r2_test(kUnit) < .01
+        continue
+    end
+    clix = sp{1}.clu == clusterIds(kUnit);
+    st = sp{1}.st(clix);
+    
+    [m, s, bc, v, tspcnt] = pdsa.eventPsth(st, targ1On(goodTrial), psthWindow, binSize, smoothingKernel);
+    spikeCount(:,kUnit) = pdsa.countSpikes(st, targ1On(goodTrial), countingWindow);
+    errorbarFill(bc, m, s, cmap(kUnit,:), 'EdgeColor', 'none', 'FaceAlpha', .5); hold on
+    axis tight
+end
+
+xlabel('Time (sec)')
+ylabel('Spike Rate')
+title('PSTH')
+
+set(gcf, 'Color', 'w')
+
+
+t1cho = arrayfun(@(x) x.targChosen == 1, psa.trial);
+t2cho = arrayfun(@(x) x.targChosen == 2, psa.trial);
+fprintf('Target 1 chosen %d times\n', sum(t1cho))
+fprintf('Target 2 chosen %d times\n', sum(t2cho))
+
+t1direction = arrayfun(@(x) x.targDirection(1), psa.trial(goodTrial));
+t2direction = arrayfun(@(x) x.targDirection(2), psa.trial(goodTrial));
+
+directions = unique([t1direction; t2direction]);
+nDirections = numel(directions);
+
+Tc1 = nan(nDirections, nUnits);
+Tc2 = nan(nDirections, nUnits);
+Tc1err = nan(nDirections, nUnits);
+Tc2err = nan(nDirections, nUnits);
+
+for iDirection = 1:nDirections
+    iix = t1direction==directions(iDirection);
+    Tc1(iDirection, :) = mean(spikeCount(iix,:));
+    Tc1err(iDirection, :) = std(spikeCount(iix,:))/sqrt(sum(iix));
+    
+    iix = t2direction==directions(iDirection);
+    Tc2(iDirection, :) = mean(spikeCount(iix,:));
+    Tc2err(iDirection, :) = std(spikeCount(iix,:))/sqrt(sum(iix));
+end
+%%
+ax1 = axes('Position', [.7 .45 .25 .1]);
+ax2 = axes('Position', [.7 .35 .25 .1]);
+for kUnit = 1:nUnits
+    set(gcf, 'currentaxes', ax1)
+    errorbarFill(directions, Tc1(:,kUnit), Tc1err(:,kUnit), cmap(kUnit,:), 'EdgeColor', 'none', 'FaceAlpha', .5); hold on
+    plot(directions, Tc1(:,kUnit), 'Color', cmap(kUnit,:), 'Linewidth', 2)
+    xlabel('Direction')
+    ylabel('Spike Count')
+%     title('Target 1')
+    axis tight
+    
+    set(gcf, 'currentaxes', ax2)
+    errorbarFill(directions, Tc2(:,kUnit), Tc2err(:,kUnit), cmap(kUnit,:), 'EdgeColor', 'none', 'FaceAlpha', .5); hold on
+    plot(directions, Tc2(:,kUnit), 'Color', cmap(kUnit,:), 'Linewidth', 2)
+    xlabel('Direction')
+    ylabel('Spike Count')
+%     title('Target 2')
+    axis tight
+end
+
+fname = [thisSession.Subject{1} '_' datestr(datenum(thisSession.Date{1}), 'yyyymmdd') '.pdf'];    
+set(gcf, 'PaperSize', [8.5 11], 'PaperPosition', [0 0 8.5 11])
+saveas(gcf, fname)
+%%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%
+
+
 %% Flash / Saccade triggered CSD
 ops = io.loadOps(thisSession);
 % pick a shank and load LFP
 iShank = 1;
 [lfp, lfpTime, lfpInfo] = io.getLFP(ops(iShank));
 lfpInfo.fragments = round(lfpInfo.fragments);
-% --- flash-triggered
-csdTrial = io.csdTrial(PDS);
-if isfield(csdTrial, 'onset')
-    flashTimes = [csdTrial.onset];
-else
-    flashTimes = 1;
-end
 
-if ops(iShank).Nchan > 10
-    figure(1); clf
-    subplot(1,2,1)
-    plot.CsdBasic(lfp, flashTimes, lfpInfo)
-    title('Flash Triggered')
-    xlabel('ms')
-    ylabel('depth')   
-end
+csd = session.csdFlash(PDS);
 
+if ~isempty(csd.trial)
+csd = session.csdFlash(PDS);
+
+ops = io.loadOps(thisSession);
+stats = csd.computeCsd(ops);
+    
+figure(1); clf
+subplot(1,2,1)
+
+imagesc(stats.time, stats.depth, stats.CSD); colormap jet
+hold on
+plot(stats.time, bsxfun(@plus, stats.STA, stats.chDepths'), 'Color', .5*[1 1 1])
+
+subplot(1,2,2)
+plot(stats.time, stats.STA)
+end
 %% --- saccade-triggered
+
 eventTimes = saccades.start';
 % find saccades that happened more than 200 ms after the last saccade
 % (uncontaminated)
@@ -220,6 +480,7 @@ if ops(iShank).Nchan > 10
     ylabel('depth')
 end
 
+%%
 % Look for saccade-direction tuning in the LFP
 th = cart2pol(saccades.endXpos - saccades.startXpos, saccades.endYpos - saccades.startYpos)'/pi*180;
 
@@ -234,7 +495,9 @@ thBins = 0:45:360;
 ch0 = (1:32)*40;
 cmap = flipud(hsv(numel(thBins)));
 if ops(iShank).Nchan > 10
-    subplot(1,2,2)
+     subplot(1,2,2);
+%     ax1 = subplot(1,2,2);
+%     set(gcf, 'currentaxes', ax1)
     for i = 1:numel(thBins)-1
         
         ii = th > thBins(i) & th < thBins(i+1);
@@ -257,6 +520,7 @@ if ops(iShank).Nchan > 10
         axis off
         
     end
+%     set(gcf, 'currentaxes', ax1)
     xlim([-1 10])
     ylim([-10 1])
     title('Saccade-triggered LFP')
@@ -307,7 +571,7 @@ iShank = 1;
 figure(3); clf
 s = sp{iShank};
 if isfield(s, 'uQ')
-    goodUnits = s.cgs > 1;
+    goodUnits = s.cgs >= 1;
     udepths = s.clusterDepths(goodUnits);
     uId = s.cids(goodUnits);
     [~, depthId] = sort(udepths);
@@ -348,11 +612,12 @@ hart = session.hartleyFF(PDS);
 hart.buildDesignMatrix();
 
 
+
 %% 
 iShank = 1;
 s = sp{iShank};
 if isfield(s, 'cgs')
-    clustIds = s.cids(s.cgs>1);
+    clustIds = s.cids(s.cgs>=1);
 else
     clustIds = s.cids;
 end
@@ -362,10 +627,10 @@ figure(2); clf
 ax = pdsa.tight_subplot(nUnits, 2, .01, .01);
 for kUnit = 1:nUnits
     spikeTimes = s.st(s.clu==clustIds(kUnit));
-%     set(gcf, 'currentaxes', ax((kUnit-1)*2 + 1))
-    pdsa.plotRaster(spikeTimes, [hart.trial.start], [-.1 20], .01)
-    pause
-end
+    set(gcf, 'currentaxes', ax((kUnit-1)*2 + 1))
+%     pdsa.plotRaster(spikeTimes, [hart.trial.start], [-.1 20], .01)
+%     pause
+% end
 
     sta = hart.spikeTriggeredAverage(spikeTimes);
     
@@ -393,6 +658,7 @@ end
 end
 %% plot frozen trials
 figure(11); clf
+s.cgs(:) = 3;
 hart.plotFrozenRaster(s);
 
 %% dot revco mapping
