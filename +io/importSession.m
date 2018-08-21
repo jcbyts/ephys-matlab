@@ -130,9 +130,8 @@ PDS = io.getPds(sess, overwrite);
 if isempty(PDS)
     warning('No PDS files were found. missing PDS files?')
 else
-    % converts eyelink files to *.mat files
-    % TODO: include module for arrington
-    io.getEdf(sess, PDS, overwrite);
+    % converts eyetracker files to *.dat and *.mat files
+    io.getEyeData(sess, PDS, overwrite);
 end
 
 % Step 4: Import LFP
