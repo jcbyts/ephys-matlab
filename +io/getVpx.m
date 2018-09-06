@@ -60,19 +60,8 @@ if exist(feye, 'file') && ~overwrite
     nTotSamps = filesize/nFields/2;
     
     data = double(fread(fid, [nFields nTotSamps], '*uint16'));
-    data(1:2,:) = data(1:2,:)*elInfo.bitDeg(1) + elInfo.bitDeg(2);
-    data(1,data(3,:)==0) = nan;
-    data(2,data(3,:)==0) = nan;
     
-    timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
-    
-    if flipX
-        data(1,:) = -data(1,:);
-    end
-    
-    if flipY
-        data(2,:) = -data(2,:);
-    end
+    [data, timestamps] = convertRawToDeg(data, elInfo, flipX, flipY);
     
     return
     
@@ -119,9 +108,20 @@ nFields = numel(elInfo.fields);
 nTotSamps = filesize/nFields/2;
 
 data = double(fread(fid, [nFields nTotSamps], '*uint16'));
+[data, timestamps] = convertRawToDeg(data, elInfo, flipX, flipY);
+
+% -------------------------------------------------------------------------
+% Helper functions
+%--------------------------------------------------------------------------
+
+% --- Convert from raw file values to degrees and time
+function [data, timestamps] = convertRawToDeg(data, elInfo, flipX, flipY)
+
 data(1:2,:) = data(1:2,:)*elInfo.bitDeg(1) + elInfo.bitDeg(2);
-data(1,data(3,:)==0) = nan;
-data(2,data(3,:)==0) = nan;
+if ~all(data(3,:)==0)
+    data(1,data(3,:)==0) = nan;
+    data(2,data(3,:)==0) = nan;
+end
 
 timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
 
@@ -133,7 +133,7 @@ if flipY
     data(2,:) = -data(2,:);
 end
 
-
+% --- Apply the calibration matrix to data read in from the vpx file
 function [data, timestamps, info] = getVpxData(sess, PDS)
 % INPUT
 %   sess
@@ -158,6 +158,13 @@ function [data, timestamps, info] = getVpxData(sess, PDS)
 % ViewPoint user guide.
 
 % Find all times the calibration matrix changed
+if ~isfield(PDS, 'initialParameters')
+    PDS.initialParameters = PDS.data;
+    PDS.initialParameterNames = cell(1,numel(PDS.data));
+    for i = 1:numel(PDS.data)
+        PDS.initialParameterNames{i} = ['Pause after ' num2str(i)];
+    end
+end
 arringtonChanged = find(cellfun(@(x) isfield(x, 'arrington'), PDS.initialParameters));
 pauseTrials    = find(cellfun(@(x) ~isempty(regexp(x, 'Pause', 'once')), PDS.initialParameterNames));
 arringtonChangedAfterPause = intersect(arringtonChanged, pauseTrials);
@@ -166,16 +173,20 @@ trialNums = cellfun(@(x) str2double(cell2mat(regexp(x, '\d+', 'match'))), change
 
 calibMatChanged = cellfun(@(x) isfield(x.arrington, 'calibration_matrix'), PDS.initialParameters(arringtonChangedAfterPause));
 
+
 calibMat = [];
 if ~isempty(PDS.initialParametersMerged.arrington.calibration_matrix)
     calibMat = {PDS.initialParametersMerged.arrington.calibration_matrix};
 end
 
-calibMat = [calibMat cellfun(@(x) x.arrington.calibration_matrix, PDS.initialParameters(arringtonChangedAfterPause), 'UniformOutput', false)];
+calibMat = [calibMat cellfun(@(x) x.arrington.calibration_matrix,...
+            PDS.initialParameters(arringtonChangedAfterPause), 'UniformOutput', false)];
 
 calibMatChangeIdx = trialNums(calibMatChanged);
 
+
 VpxTimeCmChanged = [0 cellfun(@(x) x.timing.arringtonStartTime(2), PDS.data(calibMatChangeIdx))]*1e3;
+% VpxTimeCmChanged = [0 cellfun(@(x) x.timing.arringtonStartTime(1), PDS.data(calibMatChangeIdx))]*1e3;
 
 eyeIdx = PDS.initialParametersMerged.arrington.eyeIdx;
 
@@ -191,6 +202,8 @@ if hasEdf
 end
 
 pdsTrialStarts=cellfun(@(x) x.timing.arringtonStartTime(1), PDS.data);
+
+vpxTrialTS(:) = vpxTrialTS(:)*1000;  % go from secs to ms
 
 AR2OEfit =[vpxTrialTS(:) ones(numel(vpxTrialTS),1)]\PDS.PTB2OE(pdsTrialStarts(:));
 AR2OE  =@(x) x*AR2OEfit(1) + AR2OEfit(2); % this converts from Eyelink sample times to OE times
@@ -257,7 +270,7 @@ info.timestamps = timestamps([1 breaks]);
 info.dateNum = PDS.initialParametersMerged.session.initTime;
 
 
-
+% --- Read in raw data fromthe Vpx File
 function v = importVpx(vpxFile, varargin)
 % import eye data from the Vpx File
 
