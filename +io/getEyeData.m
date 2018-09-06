@@ -17,8 +17,11 @@ if isempty(eyetracker)
     eyetracker = 'none';
     
     % figure out which eyetracker to use
-    useEyelink   = cellfun(@(x) isfield(x.initialParametersMerged, 'eyelink') & x.initialParametersMerged.eyelink.useAsEyepos, PDS);
-    useArrington = cellfun(@(x) isfield(x.initialParametersMerged, 'arrington') & x.initialParametersMerged.arrington.useAsEyepos, PDS);
+    hasEyelink   = cellfun(@(x) isfield(x.initialParametersMerged, 'eyelink'), PDS);
+    hasArrington = cellfun(@(x) isfield(x.initialParametersMerged, 'arrington'), PDS);
+    
+	useArrington = cellfun(@(x) x.initialParametersMerged.arrington.useAsEyepos, PDS(hasArrington));
+    useEyelink   = cellfun(@(x) x.initialParametersMerged.eyelink.useAsEyepos, PDS(hasEyelink));
     
     if sum(useEyelink) > sum(useArrington)
         eyetracker = 'eyelink';
