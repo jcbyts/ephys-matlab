@@ -59,7 +59,7 @@ classdef psaForage < handle
             pdsDate = PDS.initialParametersMerged.session.initTime;
             if isfield(PDS.initialParametersMerged.git, 'pep')
                 
-                if (1)% any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
+                if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
                     
                     if pdsDate > datenum(2018, 12, 12)
                         trial = session.psaForage.importPDS_v2(PDS);
@@ -70,20 +70,26 @@ classdef psaForage < handle
                     end
                     
                 else
-                    error('unknown version')
+                    warning('session.psaForage: your experiment file did not log the git version of the stimulus protocol. Attempting to use import version 1')
+                    try
+                        trial = session.psaForage.importPDS_v1(PDS);
+                    catch
+                        warning('session.psaForage: version 1 import did not work')
+                    end
                 end
             else
+                warning('session.psaForage: your experiment file did not log the git version of the stimulus protocol. Attempting import with version 1')
                 try
-                     trial = session.psaForage.importPDS_v1(PDS);
-                catch me
-                    error('unknown version')
+                    trial = session.psaForage.importPDS_v1(PDS);
+                catch
+                    warning('session.psaForage: version 1 import did not work')
                 end
             end
            
        end
        
        function psaTrial = importPDS_v2(PDS)
-          error('not implemented yet')
+          error('session.psaForage/importPDS_v2: not implemented yet')
        end
        
        function psaTrial = importPDS_v1(PDS)
