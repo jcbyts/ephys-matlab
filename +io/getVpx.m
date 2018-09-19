@@ -82,7 +82,7 @@ for kPds = 1:nPds
     fwrite(fidout, dataRAW', '*uint16') % write to disk
     
     % update info struct
-    elInfo.timestamps   = [elInfo.timestamps el_info.timestamps']; %Changed by Shanna to match 
+    elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
     elInfo.fragments    = [elInfo.fragments el_info.fragments];
     elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
     elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
@@ -265,7 +265,7 @@ tol = .5; % half a millisecond tolerance
 breaks = find( abs(dT - ss) > tol)'+1;
 
 info.fragments = diff([0 breaks numel(vpxTime)]);
-timestamps = AR2OE(vpxTime);
+timestamps = AR2OE(vpxTime(:)');
 info.timestamps = timestamps([1 breaks]);
 info.dateNum = PDS.initialParametersMerged.session.initTime;
 
