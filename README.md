@@ -49,7 +49,7 @@ Repos associated with PLDAPS/Eyelink/OpenEphys:
 
 [PLDAPS](https://github.com/jcbyts/PLDAPS/tree/noparams), 
 [PEP](https://github.com/jcbyts/pds-stimuli), 
-[edfmex](https://github.com/HukLab/edfmex)
+[edfmex](https://github.com/HukLab/edfmex),
 [analysis-tools](https://github.com/open-ephys/analysis-tools)
 
 Repos associated with KiloSort:
