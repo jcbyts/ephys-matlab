@@ -43,13 +43,29 @@ A central component of ephys-matlab is the use of meta data for tracking what ex
 
 
 ## Installation
-Requires the following git repos are in the matlab path.
-[KiloSort](https://github.com/cortex-lab/KiloSort)
-[Spkes](https://github.com/cortex-lab/spikes)
-[SortQuality](https://github.com/cortex-lab/sortingQuality)
-[PLDAPS](https://github.com/jcbyts/PLDAPS/tree/noparams)
-[PEP](https://github.com/jcbyts/pds-stimuli)
+The following git repositories are required for ephys-matlab to import a session.
 
+Repos associated with PLDAPS/Eyelink/OpenEphys:
+
+[PLDAPS](https://github.com/jcbyts/PLDAPS/tree/noparams), 
+[PEP](https://github.com/jcbyts/pds-stimuli), 
+[edfmex](https://github.com/HukLab/edfmex)
+[analysis-tools](https://github.com/open-ephys/analysis-tools)
+
+Repos associated with KiloSort:
+
+[KiloSort](https://github.com/cortex-lab/KiloSort), 
+[Spkes](https://github.com/cortex-lab/spikes), 
+[SortQuality](https://github.com/cortex-lab/sortingQuality), 
+[npy-matlab](https://github.com/kwikteam/npy-matlab)
+
+Once the repositories are on you disk, edit `addEphysMatlab` to appropriately point to each of them and then add them to the matlab path.
+
+`ephys-matlab` uses matlab preferences to manage the location of local data and server data. Set up both directories using the following commands in matlab.
+
+`setpref('EPHYS', 'SERVER_DATA', '/full/path/to/the/data/on/the/server')`
+
+`setpref('EPHYS', 'LOCAL_DATA', '/full/path/to/folder/on/local/disk')`
 
 ## Importing a session
 The file `import_script.m` provides a template for importing an ephys session collected with PLDAPS / Open-Ephys / Eyelink
