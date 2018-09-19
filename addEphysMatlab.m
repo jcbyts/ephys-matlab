@@ -13,9 +13,9 @@ dirs{4} = fullfile(reposDir, 'sortingQuality');
 dirs{5} = fullfile(reposDir, 'analysis-tools'); % open ephys tools
 
 reposDir = 'C:\Users\Jake\Dropbox\MatlabCode\Repos\';
-dirs{6}  = fullfile(reposDir, 'scalablerf'); % for receptive field estimation
-dirs{7}  = fullfile(reposDir, 'pdstools');   % useful matlab functions for ephys
-dirs{8}  = fullfile(reposDir, 'ncclabcode'); % general useful matlab functions
+% dirs{6}  = fullfile(reposDir, 'scalablerf'); % for receptive field estimation
+% dirs{7}  = fullfile(reposDir, 'pdstools');   % useful matlab functions for ephys
+% dirs{8}  = fullfile(reposDir, 'ncclabcode'); % general useful matlab functions
 dirs{9}  = fullfile(reposDir, 'PLDAPS');     % stimulus generation
 dirs{10} = fullfile(reposDir, 'edfmex');      % mex file for reading edf
 dirs{11}  = fullfile(reposDir, 'pds-stimuli');
