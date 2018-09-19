@@ -21,7 +21,7 @@ PLDAPS manages stimulus presentation and behavioral monitoring. Open-Ephys
 ## Meta Data
 A central component of ephys-matlab is the use of meta data for tracking what experiments / analyses have been run. In many ways, we use this as if we had a database, but it is not one!! It is just an excel file that keeps track of the
 
-###Automagically tracked features
+### Automagically tracked features
 * Date
 * Subject
 * Directory
@@ -32,7 +32,7 @@ A central component of ephys-matlab is the use of meta data for tracking what ex
 * SpikeSorting
 * LFpPhaseCorrection
 
-###Manually tracked features
+### Manually tracked features
 * Weight
 * Chamber
 * Rig
@@ -41,6 +41,14 @@ A central component of ephys-matlab is the use of meta data for tracking what ex
 * FlipXEye
 * FlipYEye
 
+
+## Installation
+Requires the following git repos are in the matlab path.
+[KiloSort](https://github.com/cortex-lab/KiloSort)
+[Spkes](https://github.com/cortex-lab/spikes)
+[SortQuality](https://github.com/cortex-lab/sortingQuality)
+[PLDAPS](https://github.com/jcbyts/PLDAPS/tree/noparams)
+[PEP](https://github.com/jcbyts/pds-stimuli)
 
 
 ## Importing a session
