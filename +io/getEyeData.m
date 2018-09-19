@@ -9,7 +9,7 @@ if nargin < 2
     PDS = io.getPds(thisSession);
 end
 
-assert(istable(thisSession), 'getEyeData: first argument must be a meta table entry')
+%assert(istable(thisSession), 'getEyeData: first argument must be a meta table entry')
 
 eyetracker = ip.Results.eyetracker;
 if isempty(eyetracker)

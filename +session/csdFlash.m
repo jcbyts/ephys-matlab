@@ -45,7 +45,7 @@ classdef csdFlash < handle
         
         function stats = computeCsd(obj, ops, varargin)
             % takes in ops
-            
+%              stats = computeCsd(obj, ops, varargin)
             ip = inputParser();
             ip.addOptional('plot', false)
             ip.parse(varargin{:})

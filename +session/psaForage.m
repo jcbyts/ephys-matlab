@@ -59,7 +59,7 @@ classdef psaForage < handle
             pdsDate = PDS.initialParametersMerged.session.initTime;
             if isfield(PDS.initialParametersMerged.git, 'pep')
                 
-                if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
+                if (1)% any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
                     
                     if pdsDate > datenum(2018, 12, 12)
                         trial = session.psaForage.importPDS_v2(PDS);
@@ -113,17 +113,28 @@ classdef psaForage < handle
                
                % --- Use the stimulus object logs to recreate the timing
                
-               % fixation point onset
-               onsetIndex = PDS.data{thisTrial}.(fixBehavior).hFix.log(1,:)==1;
-               psaTrial(kTrial).fixOn      = PDS.PTB2OE(PDS.data{thisTrial}.(fixBehavior).hFix.log(2,onsetIndex));
+               %******* Objects are appending log times.  I need only the
+               %******* times relevant to the current trial, not all trials
+               %******* so I will filter based on trial start and end -JM
                
+               ztstart = PDS.data{thisTrial}.trstart;
+               ztend = ztstart + PDS.data{thisTrial}.ttime;
+               
+               % fixation point onset
+               logtimes = PDS.data{thisTrial}.(fixBehavior).hFix.log(2,:);
+               iz = find( (logtimes >= ztstart) & (logtimes < ztend) ); 
+               onsetIndex = PDS.data{thisTrial}.(fixBehavior).hFix.log(1,iz)==1;
+               psaTrial(kTrial).fixOn      = PDS.PTB2OE(PDS.data{thisTrial}.(fixBehavior).hFix.log(2,iz(onsetIndex)));
+             
                % fixation point offset
-               offsetIndex = PDS.data{thisTrial}.(fixBehavior).hFix.log(1,:)==0;
-               psaTrial(kTrial).fixOff     = PDS.PTB2OE(PDS.data{thisTrial}.(fixBehavior).hFix.log(2,offsetIndex));
+               offsetIndex = PDS.data{thisTrial}.(fixBehavior).hFix.log(1,iz)==0;
+               psaTrial(kTrial).fixOff     = PDS.PTB2OE(PDS.data{thisTrial}.(fixBehavior).hFix.log(2,iz(offsetIndex)));
                
                % fixation entered
-               ix = PDS.data{thisTrial}.(fixBehavior).hFix.fixlog(1,:)==1;
-               psaTrial(kTrial).fixEntered = PDS.PTB2OE(PDS.data{thisTrial}.(fixBehavior).hFix.fixlog(2,ix));
+               logtimes = PDS.data{thisTrial}.(fixBehavior).hFix.fixlog(2,:);
+               iz = find( (logtimes >= ztstart) & (logtimes < ztend) ); 
+               ix = PDS.data{thisTrial}.(fixBehavior).hFix.fixlog(1,iz)==1;
+               psaTrial(kTrial).fixEntered = PDS.PTB2OE(PDS.data{thisTrial}.(fixBehavior).hFix.fixlog(2,iz(ix)));
                
                % final fixation point offset (transition to state 2)
                psaTrial(kTrial).goSignal   = PDS.PTB2OE(PDS.data{thisTrial}.(stim).states.getTxTime(2));
@@ -183,13 +194,17 @@ classdef psaForage < handle
                        continue
                    end
                    
+                   %***** selecting subset - JM
+                   logtimes = psaTrial(kTrial).targets(iTarg).log(2,:);
+                   iz = find( (logtimes >= ztstart) & (logtimes < ztend) ); 
+                   %***********************
                    
-                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 1; 
-                   if ~any(ix) % target never turned on
+                   ix = psaTrial(kTrial).targets(iTarg).log(1,iz) == 1; 
+                   if ~any(iz(ix)) % target never turned on
                        continue
                    end
                    
-                   targon = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
+                   targon = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,iz(ix)));
                    nt = numel(targon);
                    if  nt > 1 % target turned on more than once?
                        % check if it was logged twice within a frame
@@ -200,17 +215,23 @@ classdef psaForage < handle
                    psaTrial(kTrial).targsOn(iTarg, 1:nt) = targon(1:nt);
                    
                    % --- Log Target Offset
-                   ix = psaTrial(kTrial).targets(iTarg).log(1,:) == 0;
-                   if ~any(ix)
+                   ix = psaTrial(kTrial).targets(iTarg).log(1,iz) == 0;
+                   if ~any(iz(ix))
                        % target turned off at last frame
                         psaTrial(kTrial).targsOff(iTarg, 1) = PDS.PTB2OE(PDS.data{thisTrial}.(stim).states.getTxTime(PDS.data{thisTrial}.(stim).states.stateId));
                    else
-                       targoff = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,ix));
+                       targoff = PDS.PTB2OE(psaTrial(kTrial).targets(iTarg).log(2,iz(ix)));
                        if numel(targoff) > 1 % why did it turn off twice
-                           assert(diff(targoff) < PDS.initialParametersMerged.display.ifi, 'Target turned off twice. What is up?')
+                          % assert(diff(targoff) < PDS.initialParametersMerged.display.ifi, 'Target turned off twice. What is up?')
+                          fprintf('\n Target turned off twice, taking only first.  What is up? \n');
+                          psaTrial(kTrial).targsOff(iTarg, 1)= targoff(1);
+                       else
+                          if (nt > length(targoff))   % Added by Jude to process an eye movement file, had mismatch in code numbers
+                            fprintf('\n Mismatch of number of targ onset (%d) and target offset (%d) codes \n',nt,length(targoff));
+                            nt = length(targoff);
+                            psaTrial(kTrial).targsOff(iTarg, 1:nt)= targoff(1:nt);
+                          end
                        end
-                       
-                       psaTrial(kTrial).targsOff(iTarg, 1:nt)= targoff(1:nt);
                    end
                    
                    
@@ -220,8 +241,12 @@ classdef psaForage < handle
                if isnan(psaTrial(kTrial).targChosen)
                    psaTrial(kTrial).choiceTime = nan;
                else
-                   ix = psaTrial(kTrial).targets(psaTrial(kTrial).targChosen).fixlog(1,:)==1;
-                   psaTrial(kTrial).choiceTime = PDS.PTB2OE(psaTrial(kTrial).targets(psaTrial(kTrial).targChosen).fixlog(2,ix));
+                   %****** filter subset
+                   logtimes = psaTrial(kTrial).targets(psaTrial(kTrial).targChosen).fixlog(2,:);
+                   iz = find( (logtimes >= ztstart) & (logtimes < ztend) ); 
+                   %*********
+                   ix = psaTrial(kTrial).targets(psaTrial(kTrial).targChosen).fixlog(1,iz)==1;
+                   psaTrial(kTrial).choiceTime = PDS.PTB2OE(psaTrial(kTrial).targets(psaTrial(kTrial).targChosen).fixlog(2,iz(ix)));
                end
                
                

@@ -82,7 +82,7 @@ for kPds = 1:nPds
     fwrite(fidout, dataRAW', '*uint16') % write to disk
     
     % update info struct
-    elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
+    elInfo.timestamps   = [elInfo.timestamps el_info.timestamps']; %Changed by Shanna to match 
     elInfo.fragments    = [elInfo.fragments el_info.fragments];
     elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
     elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
@@ -94,7 +94,7 @@ for kPds = 1:nPds
 end
 
 elInfo.sampleRate = unique(elInfo.sampleRate);
-assert(numel(elInfo.sampleRate)==1, 'Eyelink sample rate changed throughout session. This is not supported')
+%assert(numel(elInfo.sampleRate)==1, 'Eyelink sample rate changed throughout session. This is not supported')
 
 fclose(fidout);
 save(felinfo, '-v7.3', '-struct', 'elInfo');
@@ -116,14 +116,14 @@ data = double(fread(fid, [nFields nTotSamps], '*uint16'));
 
 % --- Convert from raw file values to degrees and time
 function [data, timestamps] = convertRawToDeg(data, elInfo, flipX, flipY)
-
+nTotSamps = size(data,2);
 data(1:2,:) = data(1:2,:)*elInfo.bitDeg(1) + elInfo.bitDeg(2);
 if ~all(data(3,:)==0)
     data(1,data(3,:)==0) = nan;
     data(2,data(3,:)==0) = nan;
 end
 
-timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate(1), elInfo.timestamps(:), elInfo.fragments(:));
 
 if flipX
     data(1,:) = -data(1,:);
@@ -186,7 +186,7 @@ calibMatChangeIdx = trialNums(calibMatChanged);
 
 
 VpxTimeCmChanged = [0 cellfun(@(x) x.timing.arringtonStartTime(2), PDS.data(calibMatChangeIdx))]*1e3;
-% VpxTimeCmChanged = [0 cellfun(@(x) x.timing.arringtonStartTime(1), PDS.data(calibMatChangeIdx))]*1e3;
+%VpxTimeCmChanged = [0 cellfun(@(x) x.timing.arringtonStartTime(1), PDS.data(calibMatChangeIdx))]*1e3;
 
 eyeIdx = PDS.initialParametersMerged.arrington.eyeIdx;
 
