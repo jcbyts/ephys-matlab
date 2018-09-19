@@ -72,8 +72,8 @@ The file `import_script.m` provides a template for importing an ephys session co
 
 In the future it will support other eyetrackers, but for the time being, it expects that every session will contain three types of files
 1. Open-Ephys files (.continuous, .spikes, .events) - These are binary files. They contain the raw electrophysiological data and meta data about the session.
-2. PLDAPS files (*.PDS) - These are .mat files created by PLDAPS v4 ([open-reception branch](https://github.com/huklab/PLDAPS/tree/openreception)). they contain the stimulus and behavioral data, as well as the meta data required to synchronize the Ephys and Display computer clocks
-2. Eyelink files (*.edf) - These are proprietrary filetpe from SR research for storying eyelink data.
+2. PLDAPS files (*.PDS) - These are .mat files created by PLDAPS v4 ([noparams](https://github.com/jcbyts/PLDAPS/tree/noparams)). they contain the stimulus and behavioral data, as well as the meta data required to synchronize the Ephys and Display computer clocks
+2. Eyelink files (*.edf) - These are a proprietrary filetype from SR research for storying eyelink data.
 
 Make sure that all the paths are added
 ```matlab
@@ -81,9 +81,9 @@ addEphysMatlab
 ```
 
 ### Setup the electrodes / headstages used
-"Shank" refers to a particular array or group of electrodes. Ephys-matlab will separate recordings by shank. Shanks will be spike-sorted separately and the processed data will live in separate directories.
+"Shank" refers to a particular array or group of electrodes. Ephys-matlab will separate recordings by shank. Shanks will be spike-sorted separately and the processed data will live in separate directories. Use `edit hardware.electrodeFactory` to see the available recording devices. To add a recording device, simply add a new `case` to the switch statement and update it to point to the appropriate files (under `hardware.electrode`, and `hardware.headstage`).
 
-Specify a recording shank:
+Here is an example of a recording shank entry:
 
 ``` matlab
 shank{1} = hardware.electrode.Shank2;
@@ -138,6 +138,18 @@ shank{2} = hardware.electrode.customChannelMap(chanMap);
 shank{2}.name = 'MtBurrHoleMapping';
 ```
 If you chose hardware.electrode.customChannelMap(chNum), the channel map will be chanMap. That's it. No specifying headstage necessary. Behind the scenes, it is calling `hardware.headstage.blank32`, which applies no channel map.
+
+### run import session
+Call `io.importSession()` without any arguments to run a generic import. This will ask you to select a directory where the data from the session live. Then it will prompt for a recording device (shank) and then automatically population the meta table with information from the available data.
+
+## Working with ephys-matlab
+If a session has been imported, it will show up as a row in the excel file under `getpref('EPHYS', 'SERVERDATA')`.
+
+For example,
+
+``` matlab
+meta = io.getExperimentsAnd('Subject', 'Ellie', 'Chamber', 'V1', 'Lens', 1, 'StimulusProtocols', 'hartleyFF', 'SpikeSorting', 'Kilo');
+```
 
 
 
