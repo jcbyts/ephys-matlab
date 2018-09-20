@@ -5,8 +5,6 @@ addpath(pathto)
 addpath(fullfile(pathto, 'utils'))
 
 % --- List of paths that are required
-switch system('hostname')
-    case
 reposDir = 'C:\Users\Jake\Repos';
 kDir = 1;
 dirs{kDir} = fullfile(reposDir, 'KiloSort');
