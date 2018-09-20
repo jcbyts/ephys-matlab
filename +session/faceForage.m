@@ -129,6 +129,12 @@ classdef faceForage < handle
                 
                 if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
                     
+                    % this date checking is just a crude way I've been
+                    % tracking versions. We probably should do something
+                    % more sophisticated, but I haven't had time. We do
+                    % save the exact commit and git diff, but it seems like
+                    % too much work to reconstruct from that. I don't know.
+                    % -- Jake
                     if pdsDate > datenum(2018, 02, 01)
                         [trial, display] = session.faceForage.importPDS_v2(PDS);
                     else
@@ -136,7 +142,12 @@ classdef faceForage < handle
                     end
                     
                 else
-                    error('unknown version')
+                    warning('faceForage: pds-stimuli git either on wrong branch, or it is not setup to track. running version 2 import')
+                    try
+                        [trial, display] = session.faceForage.importPDS_v2(PDS);
+                    catch 
+                        error('version 2 import failed')
+                    end
                 end
             else
                 [trial, display] = session.faceForage.importPDS_v1(PDS);

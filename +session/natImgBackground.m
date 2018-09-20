@@ -59,7 +59,12 @@ classdef natImgBackground < handle
                     end
                     
                 else
-                    error('unknown version')
+                   warning('natImgBackground: git tracking failed. using version 2 import')
+                   try
+                       trial = session.natImgBackground.importPDS_v2(PDS);
+                   catch
+                       error('version 2 import failed')
+                   end
                 end
             else
                 trial = session.natImgBackground.importPDS_v1(PDS);

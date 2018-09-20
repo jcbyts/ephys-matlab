@@ -297,7 +297,12 @@ classdef hartleyFF < handle
                     end
                     
                 else
-                    error('unknown version')
+                    warning('hartleyFF: git tracking failed. running import version 2')
+                    try
+                        [trial, display] = session.hartleyFF.importPDS_v2(PDS);
+                    catch
+                        error('version 2 import failed')
+                    end
                 end
             else
                 [trial, display] = session.hartleyFF.importPDS_v1(PDS);

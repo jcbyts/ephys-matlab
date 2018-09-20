@@ -816,7 +816,12 @@ classdef squareFlash < handle
                     end
                     
                 else
-                    error('unknown version')
+                    warning('squareFlash: git tracking failed. Trying import version 2')
+                    try
+                        [trial, display] = session.squareFlash.importPDS_v2(PDS);
+                    catch
+                        error('Version 2 import failed')
+                    end
                 end
             else
                 [trial, display] = session.squareFlash.importPDS_v1(PDS);
