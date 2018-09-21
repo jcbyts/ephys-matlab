@@ -9,23 +9,23 @@ p = inputParser;
 p.addParameter('debug',false,@(x) validateattributes(x,{'logical'},{'scalar'}));
 
 p.parse(args{:});
-      
-args = p.Results;
+
+args = p.Results; %#ok<NASGU>
 
 t = d.t; % sample time(s)
 
 if isempty(tstart)
-  tstart = min(t);
+    tstart = min(t);
 end
 
 if isempty(tstop)
-  tstop = max(t);
+    tstop = max(t);
 end
 
 idx = (t >= tstart) & (t <= tstop); % samples to keep...
 
-if ~any(idx),
-  return
+if ~any(idx)
+    return
 end
 
 d.tsample = d.tsample(idx);

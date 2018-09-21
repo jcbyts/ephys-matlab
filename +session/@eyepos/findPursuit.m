@@ -13,7 +13,7 @@ function [tstart,tend,idx,vel] = findPursuit(d,varargin)
 %   sargs    - cell array of arguments passed through to @eye.findSaccades()
 %   debug    - show debugging output (default: false)
 %
-% See also: eye.findSaccades, eye.rmSaccades. 
+% See also: eye.findSaccades, eye.rmSaccades.
 
 % using lpfirdd between 40 and 60Hz works pretty well...
 
@@ -43,16 +43,16 @@ p.addParameter('debug',true,@(x) validateattributes(x,{'logical'},{'scalar'}));
 p.addParameter('sargs',{},@iscell);
 
 p.parse(args{:});
-      
+
 args = p.Results;
 
 % % find saccades...
 % [~,~,ix] = d.findSaccades(args.sargs);
-% 
-% if 0 & ~isempty(ix),  
+%
+% if 0 & ~isempty(ix),
 %   % extend 'window' by args.dt before and after each saccade
 %   n = ceil(args.dt./d.dt);
-%  
+%
 %   ix(:,1) = max(ix(:,1)-n,1);
 %   ix(:,2) = min(ix(:,2)+n,length(d.t));
 % end
@@ -67,44 +67,44 @@ args = p.Results;
 speed = hypot(vel.x,vel.y); % direction and speed
 
 if args.debug
-  figure;
-  
-  ah(1) = subplot(3,1,1);
-  plot(d.t,vel.x); hold on;
-
-  ylabel('H. Vel. (deg./s)');
-  
-  ah(2) = subplot(3,1,2);
-  plot(d.t,vel.y); hold on;
-  
-  ylabel('V. Vel. (deg./s)');
-  
-  ah(3) = subplot(3,1,3);
-  plot(d.t,speed); hold on;
-
-  xlabel('Time (s)');
-  ylabel('Eye speed (deg./s)');
-  
-  if ~isempty(idx),
-    for ii = 1:3.
-      axes(ah(ii));
+    figure;
     
-      % show saccades (shaded)
-      for jj = 1:size(idx,1),
-        x = kron(d.t(idx(jj,:))',[1,1]);
-        y = [ylim, fliplr(ylim)];
-        fh = fill(x,y,[1.0,0.90,0.90]); % red
-        set(fh,'EdgeColor','none','ZData',-1*ones(size(x)));
-      end
+    ah(1) = subplot(3,1,1);
+    plot(d.t,vel.x); hold on;
     
-      xlim([min(d.t),max(d.t)]);
+    ylabel('H. Vel. (deg./s)');
+    
+    ah(2) = subplot(3,1,2);
+    plot(d.t,vel.y); hold on;
+    
+    ylabel('V. Vel. (deg./s)');
+    
+    ah(3) = subplot(3,1,3);
+    plot(d.t,speed); hold on;
+    
+    xlabel('Time (s)');
+    ylabel('Eye speed (deg./s)');
+    
+    if ~isempty(idx)
+        for ii = 1:3.
+            set(gcf, 'currentaxes', ah(ii));
+            
+            % show saccades (shaded)
+            for jj = 1:size(idx,1)
+                x = kron(d.t(idx(jj,:))',[1,1]);
+                y = [ylim, fliplr(ylim)];
+                fh = fill(x,y,[1.0,0.90,0.90]); % red
+                set(fh,'EdgeColor','none','ZData',-1*ones(size(x)));
+            end
+            
+            xlim([min(d.t),max(d.t)]);
+        end
     end
-  end
-  
-  % show threshold
-  plot(xlim,args.thresh*[1,1],'r--');
-  
-  set(ah,'Layer','top');
+    
+    % show threshold
+    plot(xlim,args.thresh*[1,1],'r--');
+    
+    set(ah,'Layer','top');
 end
 
 % +ve going zero crossings
@@ -117,47 +117,47 @@ mmn = movingmin(speed,n);
 idx(mmn(idx) < args.thresh) = [];
 
 if isempty(idx)
-  tstart = [];
-  tend = [];
-  return
+    tstart = [];
+    tend = [];
+    return
 end
 
 idx = kron(idx,ones(1,2)); % pursuit indicies (start, end)
-for ii = 1:size(idx,1),
-%   t0 = max(idx(ii,2)-n,1);
-  t0 = idx(ii,1);
-%   t1 = min(idx(ii,2)+n,length(t));
-  t1 = length(d.t);  
-
-  % window speed signal (and apply threshold)
-  tmp = speed(t0:t1) - args.thresh;
-
-  if args.debug,
-    for jj = 1:3,
-      axes(ah(jj));
-
-      xx = d.t([t0,t1,t1,t0]);
-      yy = kron(get(gca,'YLim'),[1,1]);
-      fh(jj) = fill(xx(:),yy(:),[0.9,1.0,0.9]); % green
-      set(fh,'EdgeColor','none','ZData',-2*ones(size(xx)));
-    end    
-  end
-  
-  % search forward in time to find pursuit end
-  k = findZeroCrossings(tmp,-1);
-%   if ~isempty(k)
-%     k(k < n+1) = [];
-%   end
-  if isempty(k)
-    % no pursuit end...!?
-    k = (t1-t0)+1;
-  end
-  idx(ii,2) = min(k) + t0 - 1; % index of blink end
-  
-  if args.debug && ~isnan(idx(ii,2)),
-    xx = d.t(idx(ii,[1,2,2,1]));
-    arrayfun(@(h) set(h,'XData',xx),fh);
-  end
+for ii = 1:size(idx,1)
+    %   t0 = max(idx(ii,2)-n,1);
+    t0 = idx(ii,1);
+    %   t1 = min(idx(ii,2)+n,length(t));
+    t1 = length(d.t);
+    
+    % window speed signal (and apply threshold)
+    tmp = speed(t0:t1) - args.thresh;
+    
+    if args.debug
+        for jj = 1:3
+            set(gcf, 'currentaxes', ah(jj));
+            
+            xx = d.t([t0,t1,t1,t0]);
+            yy = kron(get(gca,'YLim'),[1,1]);
+            fh(jj) = fill(xx(:),yy(:),[0.9,1.0,0.9]); % green
+            set(fh,'EdgeColor','none','ZData',-2*ones(size(xx)));
+        end
+    end
+    
+    % search forward in time to find pursuit end
+    k = findZeroCrossings(tmp,-1);
+    %   if ~isempty(k)
+    %     k(k < n+1) = [];
+    %   end
+    if isempty(k)
+        % no pursuit end...!?
+        k = (t1-t0)+1;
+    end
+    idx(ii,2) = min(k) + t0 - 1; % index of blink end
+    
+    if args.debug && ~isnan(idx(ii,2))
+        xx = d.t(idx(ii,[1,2,2,1]));
+        arrayfun(@(h) set(h,'XData',xx),fh);
+    end
 end
 
 tstart = d.t(idx(:,1));

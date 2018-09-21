@@ -21,7 +21,7 @@ p.addParameter('order',1,@(x) validateattributes(x,{'numeric'},{'scalar'})); % m
 p.addParameter('debug',false,@(x) validateattributes(x,{'logical'},{'scalar'}));
 
 p.parse(args{:});
-      
+
 args = p.Results;
 
 t = d.tsample; % sample time(s)
@@ -30,30 +30,30 @@ pnames = {'x','y','pwdth','phght'}; % properties to resample
 
 % concatenate for ease of filtering etc.
 tmp = [d.x, d.y, d.pwdth, d.phght];
-  
-if args.debug,
-  for ii = 1:size(tmp,2),
-    subplot(size(tmp,2),1,ii);
-    plot(t,tmp(:,ii),'-');
-    ylabel(pnames{ii});
-    hold on
-  end
+
+if args.debug
+    for ii = 1:size(tmp,2)
+        subplot(size(tmp,2),1,ii);
+        plot(t,tmp(:,ii),'-');
+        ylabel(pnames{ii});
+        hold on
+    end
 end
 
 % optional median (pre-)filter
-if args.order > 1,
-  tmp = medfilt1(tmp,args.order,[],'truncate');
+if args.order > 1
+    tmp = medfilt1(tmp,args.order,[],'truncate');
 end
 
-if args.debug,
-  for ii = 1:size(tmp,2),
-    subplot(size(tmp,2),1,ii);
-    plot(t,tmp(:,ii),'--');
-  end
+if args.debug
+    for ii = 1:size(tmp,2)
+        subplot(size(tmp,2),1,ii);
+        plot(t,tmp(:,ii),'--');
+    end
 end
 
 % resample with cubic interpolation
-tstart = t(1); 
+tstart = t(1);
 tend = t(end);
 
 N = 20;
@@ -64,20 +64,20 @@ tmp = [repmat(tmp(1,:),N,1); tmp; repmat(tmp(end,:),N,1)];
 [tmp,t] = resample(tmp,t,args.fs,'spline');
 
 ix = find((t >= tstart) & (t <= tend)); % samples to keep
- 
+
 t = t(ix);
 tmp = tmp(ix,:);
 
-if args.debug,
-  for ii = 1:size(tmp,2),
-    subplot(size(tmp,2),1,ii);
-    plot(t,tmp(:,ii),'k-');
-    hold off
-  end
+if args.debug
+    for ii = 1:size(tmp,2)
+        subplot(size(tmp,2),1,ii);
+        plot(t,tmp(:,ii),'k-');
+        hold off
+    end
 end
 
 d.tsample = t; % < d.t = d.tsample + d.toffset
 d.toffset = d.toffset + (t(1) - tstart); % is this appropriate?
-for ii = 1:size(tmp,2),
-  d.(pnames{ii}) = tmp(:,ii);
+for ii = 1:size(tmp,2)
+    d.(pnames{ii}) = tmp(:,ii);
 end

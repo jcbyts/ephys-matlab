@@ -16,7 +16,7 @@ p.addParameter('duration',0.050,@(x) validateattributes(x,{'numeric'},{'scalar',
 p.addParameter('debug',true,@(x) validateattributes(x,{'logical'},{'scalar'}));
 
 p.parse(args{:});
-      
+
 args = p.Results;
 
 % get pupil area
@@ -51,83 +51,83 @@ idx(idx < args.order) = [];
 %
 % FIXME: here we really want a constraint on blink rate or interval...
 if numel(idx) > 1
-  idx(find(diff(idx) < n)+1) = [];
+    idx(find(diff(idx) < n)+1) = [];
 end
 
 if args.debug
-  figure;
-  plot(t,par);
-  hold on;
-  
-  plot(t,baseline,'k--');
-  plot(t,baseline*args.thresh,'k-');
-  
-  plot(t,mmx,'m-');
+    figure;
+    plot(t,par);
+    hold on;
+    
+    plot(t,baseline,'k--');
+    plot(t,baseline*args.thresh,'k-');
+    
+    plot(t,mmx,'m-');
 end
 
 if isempty(idx)
-  tstart = [];
-  tend = [];
-  delta = [];
-  return
+    tstart = [];
+    tend = [];
+    delta = [];
+    return
 end
 
 delta = NaN(size(idx)); % change in pupil area (normalized)
 
 idx = kron(idx,ones(1,2)); % blink indicies (start, end)
-for ii = 1:size(idx,1),
-%   t0 = max(idx(ii,1)-n,1);
-  t0 = idx(ii,1);
-%   t1 = min(idx(ii,2)+n,length(t));
-  t1 = length(t);
-  
-  % window pupil area signal (and apply threshold?)
-  tmp = par(t0:t1); % + args.thresh; % area
-  
-  if args.debug,
-    plot(t(t0:t1),par(t0:t1),'k:');
-
-    xx = t([t0,t1,t1,t0]);
-    yy = kron(get(gca,'YLim'),[1,1]);
-    fh = fill(xx(:),yy(:),zeros(1,3));
-    set(fh,'ZData',-1*ones(size(xx)),'FaceAlpha',0.1,'LineStyle','none');
+for ii = 1:size(idx,1)
+    %   t0 = max(idx(ii,1)-n,1);
+    t0 = idx(ii,1);
+    %   t1 = min(idx(ii,2)+n,length(t));
+    t1 = length(t);
     
-    plot(t([t0,t1]),baseline(idx(ii,1))*args.thresh*[1,1],'r-');
-  end
-  
-%   % now search back in time to find blink start
-%   k = findZeroCrossings(tmp-baseline(t0:t1)*args.thresh,-1); % area
-%   k(k > n+1) = [];
-%   idx(ii,1) = max(k) + t0 - 1; % index of blink start
+    % window pupil area signal (and apply threshold?)
+    tmp = par(t0:t1); % + args.thresh; % area
     
-  % search forward in time to find blink end
-  k = findZeroCrossings(tmp-baseline(idx(ii,1))*args.thresh,1); % area
-  if ~isempty(k)
-    k(k < n+1) = [];
-  end
-  if isempty(k)
-    % no blink end...!?
-    k = (t1-t0)+1;
-  end
-  idx(ii,2) = min(k) + t0 - 1; % index of blink end
-  
-%   delta(ii) = range(par(idx(ii,1):idx(ii,2)))./range(par);
-  delta(ii) = min(par(idx(ii,1):idx(ii,2)))./baseline(idx(ii,1)); 
-
-  if args.debug && ~isnan(idx(ii,2)),
-    xx = t(idx(ii,[1,2,2,1]));
-    arrayfun(@(h) set(h,'XData',xx),fh);
-  end
-
+    if args.debug
+        plot(t(t0:t1),par(t0:t1),'k:');
+        
+        xx = t([t0,t1,t1,t0]);
+        yy = kron(get(gca,'YLim'),[1,1]);
+        fh = fill(xx(:),yy(:),zeros(1,3));
+        set(fh,'ZData',-1*ones(size(xx)),'FaceAlpha',0.1,'LineStyle','none');
+        
+        plot(t([t0,t1]),baseline(idx(ii,1))*args.thresh*[1,1],'r-');
+    end
+    
+    %   % now search back in time to find blink start
+    %   k = findZeroCrossings(tmp-baseline(t0:t1)*args.thresh,-1); % area
+    %   k(k > n+1) = [];
+    %   idx(ii,1) = max(k) + t0 - 1; % index of blink start
+    
+    % search forward in time to find blink end
+    k = findZeroCrossings(tmp-baseline(idx(ii,1))*args.thresh,1); % area
+    if ~isempty(k)
+        k(k < n+1) = [];
+    end
+    if isempty(k)
+        % no blink end...!?
+        k = (t1-t0)+1;
+    end
+    idx(ii,2) = min(k) + t0 - 1; % index of blink end
+    
+    %   delta(ii) = range(par(idx(ii,1):idx(ii,2)))./range(par);
+    delta(ii) = min(par(idx(ii,1):idx(ii,2)))./baseline(idx(ii,1));
+    
+    if args.debug && ~isnan(idx(ii,2))
+        xx = t(idx(ii,[1,2,2,1]));
+        arrayfun(@(h) set(h,'XData',xx),fh);
+    end
+    
 end
 
 % remove false positives... e.g., due to noise etc.
 if ~isempty(idx)
-  ii = diff(idx,1,2) < n; % min. duration
-  ii = ii | delta > 0.05; % min. modulation
+    ii = diff(idx,1,2) < n; % min. duration
+    ii = ii | delta > 0.05; % min. modulation
     
-  idx(ii,:) = [];
-  delta(ii,:) = [];  
+    idx(ii,:) = [];
+    delta(ii,:) = [];
 end
 
 % % remove duplicates and/or other false positives...
