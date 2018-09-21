@@ -44,6 +44,10 @@ elInfo.dateNum    = [];
 elInfo.fields     = {'EyeX', 'EyeY', 'PupilArea'};
 elInfo.bitDeg     = 1e-3;
 
+if ~isfolder(fullfile(sess.path, '_behavior'))
+    mkdir(fullfile(sess.path, '_behavior'))
+end
+
 feye    = fullfile(sess.path, '_behavior', 'eyepos.dat');
 felinfo = fullfile(sess.path, '_behavior', 'eye_info.mat');
 
@@ -78,8 +82,13 @@ nPds = numel(PDS);
 for kPds = 1:nPds
     
 %     try
-    [dataRAW, ~, el_info] = getVpxData(sess, PDS{kPds});
-    fwrite(fidout, dataRAW', '*uint16') % write to disk
+    if isfield(PDS{kPds}, 'initialParametersMerged')
+        [dataRAW, ~, el_info] = getVpxDataPds(sess, PDS{kPds});
+    elseif (isfield(PDS{kPds}, 'D') && isfield(PDS{kPds}, 'S')) % it's marmoview
+        [dataRAW, ~, el_info] = getVpxDataMvm(sess, PDS{kPds});
+    end
+    
+    fwrite(fidout, dataRAW', '*uint16'); % write to disk
     
     % update info struct
     elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
@@ -133,8 +142,74 @@ if flipY
     data(2,:) = -data(2,:);
 end
 
-% --- Apply the calibration matrix to data read in from the vpx file
-function [data, timestamps, info] = getVpxData(sess, PDS)
+% --- Apply the marmoview calibration to data read in from the vpx file
+function [data, timestamps, info] = getVpxDataMvm(sess, MV)
+    vpxFile = fullfile(sess.path, MV.S.eyetrackerFile);
+    hasVpx=exist(vpxFile, 'file');
+    if hasVpx
+        v=importVpx(vpxFile);
+        vpxTrialStarts=cellfun(@(x) strcmp(x.eventId, 'TRIALSTART'), v.markers);
+        vpxTrialTS=double(cellfun(@(x) x.time, v.markers(vpxTrialStarts)));
+    end
+    
+    if ~isfield(MV.S, 'PTB2OE')
+        MV.S.PTB2OE = @(x) x;
+    end
+    
+    
+    vpxTime=double(v.time);
+    vpxTrialTS(:) = vpxTrialTS(:)*1000;  % go from secs to ms
+    x=double(v.x);
+    y=double(v.y);
+       
+    % build raw input
+    X=[x(:) y(:)];
+    
+    eyeXyDeg = zeros(size(X,1), 2);
+
+    assert(numel(MV.D.C)==numel(vpxTrialTS), 'getVpx/getVpxDataMvm: number of trials mismatch between vpx file and marmoview');
+    numTrials = numel(vpxTrialTS);
+    
+    for iTrial = 1:numTrials
+        
+        if iTrial == numTrials
+            iix = vpxTime >= vpxTrialTS(iTrial);
+        else
+            iix = vpxTime >= vpxTrialTS(iTrial) & vpxTime < vpxTrialTS(iTrial+1);
+        end
+        
+        eyeXyDeg(iix,:) = mvmraw2deg(X(iix,:), MV.D.C(iTrial).c, [MV.D.C(iTrial).dx MV.D.C(iTrial).dy]);
+        
+    end
+    
+    mvmTrialStarts=cellfun(@(x) x(1), MV.D.eyeData);
+    
+    
+
+    AR2OEfit =[vpxTrialTS(:) ones(numel(vpxTrialTS),1)]\MV.S.PTB2OE(mvmTrialStarts(:));
+    AR2OE  =@(x) x*AR2OEfit(1) + AR2OEfit(2); % this converts from Eyelink sample times to OE times
+    
+    dT = diff(vpxTime);
+    ss = mode(dT);
+    
+    info.sampleRate = 1e3/ss;
+    
+    tmp = min(eyeXyDeg(:));
+    info.bitDeg = [1/100 tmp];
+    
+    data = [int16((eyeXyDeg - tmp)*100) int16(pi*(v.pwdth.*v.phght)*1000)];
+    
+    tol = .5; % half a millisecond tolerance
+    breaks = find( abs(dT - ss) > tol)'+1;
+    
+    info.fragments = diff([0 breaks numel(vpxTime)]);
+    timestamps = AR2OE(vpxTime(:)');
+    info.timestamps = timestamps([1 breaks]);
+    info.dateNum = nan;
+    
+
+% --- Apply the PDS calibration matrix to data read in from the vpx file
+function [data, timestamps, info] = getVpxDataPds(sess, PDS)
 % INPUT
 %   sess
 %   PDS
@@ -194,8 +269,8 @@ eyeIdx = PDS.initialParametersMerged.arrington.eyeIdx;
 [~, fname, ~] = fileparts(PDS.initialParametersMerged.session.file);
 
 vpxFile=fullfile(sess.path, [fname '.vpx']);
-hasEdf=exist(vpxFile, 'file');
-if hasEdf
+hasVpx=exist(vpxFile, 'file');
+if hasVpx
     v=importVpx(vpxFile);
     vpxTrialStarts=cellfun(@(x) strcmp(x.eventId, 'TRIALSTART'), v.markers);
     vpxTrialTS=double(cellfun(@(x) x.time, v.markers(vpxTrialStarts)));
@@ -378,7 +453,16 @@ fclose(fid);
 
 samples = cell2mat(samples);
 
-v.time = cumsum(samples(:,2));
+% we're going to use the second column of data (which reports the sample
+% duration) because it is higher precision than the first column. However,
+% it does not track the real time of the eyetracker, so we need to correct
+% for any pauses in the file
+
+% correct for pauses in the file
+time = [0; diff(samples(:,1))]*1e3; time(time < 10) = 0;
+v.time = [0; cumsum(samples(2:end,2))] + cumsum(time);
+% debugging figure
+% figure, plot(samples(:,1)*1e3, '.'); hold on; plot(v.time, '.')
 
 v.x = samples(:,3);
 v.y = samples(:,4);
@@ -387,3 +471,8 @@ v.pwdth = samples(:,5);
 v.phght = samples(:,6);
 
 v.markers = markers;
+
+function deg = mvmraw2deg(raw,offset,gain)
+% convert raw eye position coords to degrees of visual angle
+deg = (raw-offset)./gain;
+    
