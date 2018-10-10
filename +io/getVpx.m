@@ -166,7 +166,22 @@ function [data, timestamps, info] = getVpxDataMvm(sess, MV)
     X=[x(:) y(:)];
     
     eyeXyDeg = zeros(size(X,1), 2);
-
+    
+    % use the trial numbers to find breaks in the file and guess where the
+    % match is
+    trialNumbers = cellfun(@(x) str2double(x.payload.TRIALNO), v.markers(vpxTrialStarts));
+    
+    breaks = find(diff(trialNumbers) < 1);
+    if any(breaks)
+        breaks = [breaks; numel(trialNumbers)];
+        possible_ends = trialNumbers(breaks);
+        match = find(numel(MV.D.C)==possible_ends);
+        if ~isempty(match)
+            breaks = [0; breaks];
+            vpxTrialTS = vpxTrialTS((breaks(match)+1):breaks(match+1));
+        end
+    end
+    
     assert(numel(MV.D.C)==numel(vpxTrialTS), 'getVpx/getVpxDataMvm: number of trials mismatch between vpx file and marmoview');
     numTrials = numel(vpxTrialTS);
     

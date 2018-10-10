@@ -148,6 +148,10 @@ for ii = 1:size(idx,1)
     % now search back in time to find saccade start, accounting
     % for any baseline/pursuit speed
     k = findZeroCrossings(tmp-baseline(t0:t1),1);
+    if isempty(k)
+        continue
+    end
+        
     k(k > n+1) = [];
     %   if ~isempty(k)
     idx(ii,1) = max(k) + t0 - 1; % index of saccade start

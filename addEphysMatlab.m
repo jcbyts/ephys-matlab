@@ -3,6 +3,7 @@ pathto = fileparts(mfilename('fullpath'));
 
 addpath(pathto)
 addpath(fullfile(pathto, 'utils'))
+addpath(fullfile(pathto, 'utils', 'edfmex'))
 
 % --- List of paths that are required
 reposDir = 'C:\Users\Jake\Repos';
@@ -17,7 +18,8 @@ dirs{kDir} = fullfile(reposDir, 'sortingQuality');
 kDir = kDir + 1;
 dirs{kDir} = fullfile(reposDir, 'analysis-tools'); % open ephys tools
 
-reposDir = 'C:\Users\Jake\Dropbox\MatlabCode\Repos\';
+
+reposDir = getpref('ephysmatlab', 'repos');
 % kDir = kDir + 1;
 % dirs{kDir}  = fullfile(reposDir, 'scalablerf'); % for receptive field estimation
 % kDir = kDir + 1;
@@ -26,8 +28,8 @@ reposDir = 'C:\Users\Jake\Dropbox\MatlabCode\Repos\';
 % dirs{kDir}  = fullfile(reposDir, 'ncclabcode'); % general useful matlab functions
 kDir = kDir + 1;
 dirs{kDir}  = fullfile(reposDir, 'PLDAPS');     % stimulus generation
-kDir = kDir + 1;
-dirs{kDir} = fullfile(reposDir, 'edfmex');      % mex file for reading edf
+% kDir = kDir + 1;
+% dirs{kDir} = fullfile(reposDir, 'edfmex');      % mex file for reading edf
 kDir = kDir + 1;
 dirs{kDir}  = fullfile(reposDir, 'pds-stimuli');
 % dirs{10}  = fullfile(reposDir, 'PLDAPStools'); % tools for interacting with PDLAPS

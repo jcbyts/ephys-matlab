@@ -41,7 +41,9 @@ elInfo.sampleRate = [];
 elInfo.dateNum    = [];
 elInfo.fields     = {'EyeX', 'EyeY', 'PupilArea'};
 elInfo.bitDeg     = 1e-3;
-
+if ~isfolder(fullfile(sess.path, '_behavior'))
+    mkdir(fullfile(sess.path, '_behavior'))
+end
 feye    = fullfile(sess.path, '_behavior', 'eyepos.dat');
 felinfo = fullfile(sess.path, '_behavior', 'eye_info.mat');
 
@@ -86,7 +88,7 @@ nPds = numel(PDS);
 
 for kPds = 1:nPds
     
-    try
+%     try
     [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds});
     fwrite(fidout, dataRAW', '*uint16')
     
@@ -95,9 +97,9 @@ for kPds = 1:nPds
     elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
     elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
     elInfo.bitDeg       = el_info.bitDeg;
-    catch
-        warning('no edf data for PDS %d', kPds)
-    end
+%     catch
+%         warning('no edf data for PDS %d', kPds)
+%     end
     
 end
 
@@ -138,7 +140,13 @@ function [data, timestamps, info] = getEdfData(sess, PDS)
 
 
 assert(PDS.initialParametersMerged.eyelink.useRawData, 'This import is only designed for raw data + calibration matrix')
-
+if ~isfield(PDS, 'initialParameters')
+    PDS.initialParameters = PDS.data;
+    PDS.initialParameterNames = cell(1,numel(PDS.data));
+    for i = 1:numel(PDS.data)
+        PDS.initialParameterNames{i} = ['Pause after ' num2str(i)];
+    end
+end
 % Find all times the calibration matrix changed
 eyelinkChanged = find(cellfun(@(x) isfield(x, 'eyelink'), PDS.initialParameters));
 pauseTrials    = find(cellfun(@(x) ~isempty(regexp(x, 'Pause', 'once')), PDS.initialParameterNames));
@@ -153,7 +161,7 @@ if ~isempty(PDS.initialParametersMerged.eyelink.calibration_matrix)
     calibMat = {PDS.initialParametersMerged.eyelink.calibration_matrix};
 end
 
-calibMat = [calibMat cellfun(@(x) x.eyelink.calibration_matrix, PDS.initialParameters(eyelinkChangedAfterPause), 'UniformOutput', false)];
+calibMat = [calibMat cellfun(@(x) x.eyelink.calibration_matrix, PDS.initialParameters(eyelinkChangedAfterPause(calibMatChanged)), 'UniformOutput', false)];
 
 calibMatChangeIdx = trialNums(calibMatChanged);
 

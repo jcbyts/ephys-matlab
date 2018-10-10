@@ -12,7 +12,7 @@ function hasStim = findPDScontainingStimModule(PDS, stim)
 hasStim = false(numel(PDS),1);
 for i = 1:numel(PDS)
     
-    trial = pds.getPdsTrialData(PDS);
+    trial = pds.getPdsTrialData(PDS{i});
     
     if isfield(trial, stim)
         hasStim(i) = any(arrayfun(@(x) x.(stim).use, trial));

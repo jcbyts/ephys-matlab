@@ -35,9 +35,9 @@ end
 
 switch eyetracker
     case 'eyelink'
-        [data, timestamps, info] = io.getEdf(thisSession);
+        [data, timestamps, info] = io.getEdf(thisSession,PDS,ip.Results.overwrite);
     case 'arrington'
-        [data, timestamps, info] = io.getVpx(thisSession);
+        [data, timestamps, info] = io.getVpx(thisSession,PDS,ip.Results.overwrite);
     otherwise
         data = [];
         timestamps = [];

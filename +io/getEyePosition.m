@@ -35,36 +35,20 @@ if PDS.initialParametersMerged.eyelink.use == 1
 %***************************************************************
 %*****% ADD by Shanna to take in arrington info*****************
 %***************************************************************
-elseif PDS.initialParametersMerged.arrington.useAsEyepos == 1 
+elseif PDS.initialParametersMerged.arrington.use == 1 
+           
     cm = PDS.initialParametersMerged.arrington.calibration_matrix;
-
     eyeIdx = PDS.initialParametersMerged.arrington.eyeIdx;
-    %useRaw = PDS.initialParametersMerged.arrington.useRawData; % Doesn't
-    %exist 
-
-    % --- Get eye position from the arrington buffer
-    sampleNames=PDS.data{kTrial}.arrington.sampleIds;
-
-    if useRaw
-        ixEyePos=(cellfun(@(x) any(strfind(x, 'EyeRaw')), sampleNames)); % index to find Eye position
-        ptbElXY   = PDS.data{kTrial}.arrington.samples(ixEyePos,:);
-        XY = (cm(:,:,eyeIdx)*[ptbElXY; ones(1,size(ptbElXY,2))])';
-    else 
-        ixEyePos=(cellfun(@(x) any(strfind(x, 'EyeX')), sampleNames)) | (cellfun(@(x) any(strfind(x, 'EyeY')), sampleNames)); % index to find Eye position
-        XY = PDS.data{kTrial}.arrington.samples(ixEyePos,:)';
+    %********* I don't know what to do about this here, useRaw or not
+    useRaw = PDS.initialParametersMerged.eyelink.useRawData;
+    
+    k = kTrial;
+    iFrame = PDS.data{k}.iFrame;
+    times = (PDS.data{k}.timing.flipTimes(1,:) - PDS.data{k}.timing.arringtonStartTime(1))';
+    eye_xy = PDS.data{k}.faceforage.eyes(1:iFrame,1:2);
+    pupil = zeros(iFrame,1);   % don't have pupil from arrington
+    if (useRaw == 1)
+               eye_xy = (cm(:,:,1)*[eye_xy'; ones(1,size(eye_xy',2))])';
     end
-    ixPupil=cellfun(@(x) any(strfind(x, 'Pupil')), sampleNames);
-
-
-
-    ptbElTime = PDS.data{kTrial}.arrington.samples(1,:);
-       
-        
-    time = ptbElTime/1e3-PDS.data{kTrial}.timing.arringtonStartTime(2);
-
-
-
-    pupil = PDS.data{kTrial}.arrington.samples(ixPupil,:)';
-
-    eyepos = [time(:) XY pupil(:)];
+    eyepos = [times eye_xy pupil];
 end

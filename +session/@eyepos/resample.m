@@ -53,6 +53,10 @@ if args.debug
 end
 
 % resample with cubic interpolation
+if isempty(t)
+    return
+end
+
 tstart = t(1);
 tend = t(end);
 
