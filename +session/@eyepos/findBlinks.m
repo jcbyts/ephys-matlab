@@ -28,8 +28,10 @@ fs = 1./median(diff(t)); % sampling freq. (samples/s)
 % compute baseline pupil area...
 a = 1;
 b = ones(1,args.order)./args.order;
-baseline = filter(b,a,par);
-baseline(1:args.order) = NaN;
+% baseline = filter(b,a,par);
+baseline = filtfilt(b, a, par);
+% baseline = smooth(par, args.order);
+% baseline(1:args.order) = NaN;
 % baseline = circshift(baseline,-round(args.order/2));
 
 % find blinks... i.e., -ve going threshold crossings
@@ -44,7 +46,7 @@ idx(mmx(idx) > baseline(idx)*args.thresh) = [];
 
 % ignore blinks too close to the start or end of the recording
 % idx(idx < 2*args.order+args.duration*fs) = [];
-idx(idx < args.order) = [];
+% idx(idx < args.order) = [];
 % idx(idx > length(t)-args.duration*fs) = [];
 
 % test for minimum blink duration (?) violations...
@@ -129,6 +131,23 @@ if ~isempty(idx)
     idx(ii,:) = [];
     delta(ii,:) = [];
 end
+
+% check for blinks at the edges
+z = zscore(par);
+poscross = findZeroCrossings(z + 4, 1);
+negcross = findZeroCrossings(z + 4, -1);
+
+% blink at start
+if ~isempty(poscross) && poscross(1) < 200
+    idx = [[1 poscross(1)+100]; idx];
+end
+   
+% blink at end
+nn = numel(z);
+if ~isempty(negcross) && negcross(end) > (nn - 200)
+    idx = [idx; [negcross(end)-100 nn]];
+end
+
 
 % % remove duplicates and/or other false positives...
 % ii = 2;

@@ -1,4 +1,4 @@
-function [trial, display] = importPDS_v2(PDS)
+function [trial, display, stimTrials] = importPDS_v2(PDS)
 trial = [];
 display = PDS.initialParametersMerged.display;
 
@@ -39,6 +39,7 @@ for j = 1:numel(stimTrials)
     
     trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
     trial(kTrial).start      = trial(kTrial).frameTimes(1);
+    trial(kTrial).stop       = trial(kTrial).frameTimes(end);
     trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
     
     trial(kTrial).kx         = PDS.data{thisTrial}.(stim).kx;

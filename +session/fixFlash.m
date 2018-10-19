@@ -1,4 +1,4 @@
-classdef faceForage < handle
+classdef fixFlash < handle
     % Square flash for spatial mapping (Full Field)
     
     properties
@@ -10,21 +10,17 @@ classdef faceForage < handle
     end
     
     methods
-        function h = faceForage(PDS, varargin)
+        function h = fixFlash(PDS, varargin)
             
             ip = inputParser();
-            ip.addOptional('eyetrace', [])
-            ip.addOptional('saccades', [])
             ip.parse(varargin{:})
             
-            stim = 'forage';
+            stim = 'fixflash';
             
             [hasStim, numTrialsPerPDS] = io.findPDScontainingStimModule(PDS, stim);
             trialOffset = [0; cumsum(numTrialsPerPDS)];
-            
-            hasStim = hasStim | io.findPDScontainingStimModule(PDS, 'faceforage');
-            
-            hasStim = hasStim | session.faceForage.checkForOriginalFaceForage(PDS);
+                        
+            hasStim = hasStim | session.fixFlash.checkForOriginalFixFlash(PDS);
             
             if ~any(hasStim)
                 return
@@ -48,63 +44,6 @@ classdef faceForage < handle
             
             
             h.numTrials = numel(h.trial);
-            
-% %             % --- import eye position
-% %             eyepos = ip.Results.eyetrace;
-% %             if ~isempty(eyepos)
-% %                if size(eyepos,2) < size(eyepos,1)
-% %                    eyepos = eyepos';
-% %                end
-% %                
-% %                assert(size(eyepos,1) >= 3, 'the first row must be timestamps')
-% %                
-% %                
-% %                if ~isstruct(ip.Results.saccades)                   
-% %                    sampleRate = 1/mode(diff(eyepos(1,:)));
-% %                    ix = ~any(isnan(eyepos(2,:)));
-% %                    [saccades] = pdsa.detectSaccades(eyepos(1,ix), eyepos(2:3,ix), ...
-% %                        'verbose', false, ...
-% %                        'filterPosition', 1, ...
-% %                        'filterLength', ceil(20/sampleRate*1e3), ... % 40 ms smoothing for velocity computation
-% %                        'detectThresh', 200, ...
-% %                        'startThresh', 5, ...
-% %                        'minIsi', ceil(50/sampleRate*1e3), ...
-% %                        'minDur', ceil(4/sampleRate*1e3), ... % 4 ms
-% %                        'blinkIsi', ceil(40/sampleRate*1e3));
-% %                else
-% %                    saccades = ip.Results.saccades;
-% %                end
-% %                
-% %                if size(eyepos,1) == 4
-% %                    pupil = eyepos(4,:);
-% %                else
-% %                    pupil = [];
-% %                end
-% %                
-% %                for kTrial = 1:h.numTrials
-% %                    
-% %                    % include time before the trial starts
-% %                    preTrial = 1.5;
-% %                    
-% %                    % find valid eye position
-% %                    iix = (eyepos(1,:) > (h.trial(kTrial).start - preTrial)) & (eyepos(1,:) < (h.trial(kTrial).start + h.trial(kTrial).duration));
-% %                    h.trial(kTrial).eyeSampleTime = eyepos(1,iix);
-% %                    h.trial(kTrial).eyeXDeg = eyepos(2,iix);
-% %                    h.trial(kTrial).eyeYDeg = eyepos(3,iix);
-% %                    if ~isempty(pupil)
-% %                         h.trial(kTrial).pupilArea = pupil(iix);
-% %                    end
-% %                    
-% %                    % valid saccade times
-% %                    iix = (saccades.start > (h.trial(kTrial).start - preTrial)) & (saccades.end < (h.trial(kTrial).start + h.trial(kTrial).duration));
-% %                    fields = fieldnames(saccades);
-% %                    for iField = 1:numel(fields)
-% %                        newfield = ['sac_' fields{iField}];
-% %                        h.trial(kTrial).(newfield) = saccades.(fields{iField})(iix);
-% %                    end
-% %                end
-% % 
-% %             end
             
             
         end % constructor
@@ -142,7 +81,7 @@ classdef faceForage < handle
                     % too much work to reconstruct from that. I don't know.
                     % -- Jake
                     if pdsDate > datenum(2018, 02, 01)
-                        [trial, display, trialIdx] = session.faceForage.importPDS_v2(PDS);
+                        [trial, display, trialIdx] = session.fixFlash.importPDS_v2(PDS);
                     else
                         error('unknown version')
                     end
@@ -150,13 +89,13 @@ classdef faceForage < handle
                 else
                     warning('faceForage: pds-stimuli git either on wrong branch, or it is not setup to track. running version 2 import')
                     try
-                        [trial, display, trialIdx] = session.faceForage.importPDS_v2(PDS);
+                        [trial, display, trialIdx] = session.fixFlash.importPDS_v2(PDS);
                     catch 
                         error('version 2 import failed')
                     end
                 end
             else
-                [trial, display, trialIdx] = session.faceForage.importPDS_v0(PDS);
+                [trial, display, trialIdx] = session.fixFlash.importPDS_v0(PDS);
             end
             
         end
@@ -203,7 +142,6 @@ classdef faceForage < handle
                 
                 trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end)); %#ok<*AGROW>
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
-                trial(kTrial).stop       = trial(kTrial).frameTimes(end);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end)) - trial(kTrial).start;
                 
                 nFrames = numel(trial(kTrial).frameTimes);
@@ -278,7 +216,6 @@ classdef faceForage < handle
                 
                 trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
-                trial(kTrial).stop       = trial(kTrial).frameTimes(end);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
                 
                 trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
@@ -325,7 +262,7 @@ classdef faceForage < handle
             trial = [];
             d = pds.getPdsTrialData(PDS);
             display = d(1).display;
-            stimTrials = find(arrayfun(@(x) isfield(x.stimulus, 'motionType') & strcmp(x.stimulus.type, 'face'), d));
+            stimTrials = find(arrayfun(@(x) isfield(x.stimulus, 'fixFlashCnt'), d));
             
             stim = 'stimulus';
             for j = 1:numel(stimTrials)
@@ -338,28 +275,24 @@ classdef faceForage < handle
                 trial(kTrial).stop       = trial(kTrial).frameTimes(end);
                 trial(kTrial).duration   = PDS.PTB2OE(d(thisTrial).timing.flipTimes(1,end)) - trial(kTrial).start;
                 
-                nFrames = min(size(d(thisTrial).(stim).x, 1), numel(trial(kTrial).frameTimes));
-                trial(kTrial).frameTimes = trial(kTrial).frameTimes(1:nFrames);
-                
-                trial(kTrial).xpos = d(thisTrial).(stim).x(1:nFrames,:);
-                trial(kTrial).ypos = d(thisTrial).(stim).y(1:nFrames,:);
-                trial(kTrial).hold = d(thisTrial).(stim).ctrHold(1:nFrames,:);
-                trial(kTrial).motionType = d(thisTrial).(stim).motionType;
-                trial(kTrial).objectType = 'face';
-                
-                trial(kTrial).stop       = trial(kTrial).frameTimes(end);
+               
+                stateTransitionTimes = d(thisTrial).(stim).hTrial.txTimes;
+                trial(kTrial).fixationPointOn = stateTransitionTimes(1) + trial(kTrial).start;
+                trial(kTrial).fixationPointEntered = stateTransitionTimes(2) + trial(kTrial).start;
+                trial(kTrial).fixationPointOff = stateTransitionTimes(3) + trial(kTrial).start;
+                trial(kTrial).fixationPointXY = [0 0];
             end
             
         end
         
-        function hasStim = checkForOriginalFaceForage(PDS)
+        function hasStim = checkForOriginalFixFlash(PDS)
             
             nPds = numel(PDS);
             hasStim = false(nPds,1);
             for i = 1:nPds
                 d = pds.getPdsTrialData(PDS{i});
                 
-                hasStim(i) = any(arrayfun(@(x) isfield(x.stimulus, 'motionType'), d));
+                hasStim(i) = any(arrayfun(@(x) isfield(x.stimulus, 'fixFlashCnt'), d));
             end
         end
         

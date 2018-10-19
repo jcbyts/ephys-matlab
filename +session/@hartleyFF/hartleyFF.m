@@ -6,6 +6,7 @@ classdef hartleyFF < handle
         trial
         display
         design
+        sessionTrialIdx=[]
     end
     
     methods
@@ -13,8 +14,9 @@ classdef hartleyFF < handle
             
             stim = 'hartley';
             
+            [hasStim, numTrialsPerPDS] = io.findPDScontainingStimModule(PDS, stim);
             
-            hasStim = io.findPDScontainingStimModule(PDS, stim);
+            trialOffset = [0; cumsum(numTrialsPerPDS)];
             
             if ~any(hasStim)
                 return
@@ -24,7 +26,9 @@ classdef hartleyFF < handle
             
             for i = find(hasStim(:)')
                 
-                trial_ = h.importPDS(PDS{i});
+                [trial_, ~, idx] = h.importPDS(PDS{i});
+                
+                h.sessionTrialIdx = [h.sessionTrialIdx trialOffset(i) + idx(:)'];
                 
                 if isempty(trial_)
                     continue
@@ -63,11 +67,11 @@ classdef hartleyFF < handle
     
     methods (Static)
         
-        [trial, display] = importPDS(PDS)
+        [trial, display, trialIdx] = importPDS(PDS)
         
-        [trial, display] = importPDS_v2(PDS)
+        [trial, display, trialIdx] = importPDS_v2(PDS)
         
-        [trial, display] = importPDS_v1(PDS)
+        [trial, display, trialIdx] = importPDS_v1(PDS)
         
     end
 end

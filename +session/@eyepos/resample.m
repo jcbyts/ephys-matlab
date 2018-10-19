@@ -17,7 +17,7 @@ p.addParameter('fs',1e3,@(x) validateattributes(x,{'numeric'},{'scalar'}));
 p.addParameter('order',1,@(x) validateattributes(x,{'numeric'},{'scalar'})); % median filter order
 
 % p.addParameter('blksz',1e4,@(x) validateattributes(x,{'numeric'},{'scalar','positive'})); % median filter order
-
+p.addParameter('method', 'spline')
 p.addParameter('debug',false,@(x) validateattributes(x,{'logical'},{'scalar'}));
 
 p.parse(args{:});
@@ -65,7 +65,7 @@ t = [flipud(tstart-(t(1+[1:N])-tstart)); t; flipud(tend-(t(end-N:end-1)-tend))];
 
 tmp = [repmat(tmp(1,:),N,1); tmp; repmat(tmp(end,:),N,1)];
 
-[tmp,t] = resample(tmp,t,args.fs,'spline');
+[tmp,t] = resample(tmp,t,args.fs,args.method);
 
 ix = find((t >= tstart) & (t <= tend)); % samples to keep
 

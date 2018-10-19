@@ -8,6 +8,7 @@ classdef csdFlash < handle
         trial
         display
         method@char='spline' % csd method
+        sessionTrialIdx=[]
     end
     
     methods
@@ -17,7 +18,8 @@ classdef csdFlash < handle
             % --- find CSD flash trials
             stim = 'csdFlash';
             
-            hasStim = io.findPDScontainingStimModule(PDS, stim);
+            [hasStim, numTrialsPerPDS] = io.findPDScontainingStimModule(PDS, stim);
+            trialOffset = [0; cumsum(numTrialsPerPDS)];
             
             if ~any(hasStim)
                 return
@@ -28,7 +30,9 @@ classdef csdFlash < handle
             
             for i = find(hasStim(:)')
                 
-                trial_ = obj.importPDS(PDS{i});
+                [trial_, ~, idx] = obj.importPDS(PDS{i});
+                
+                obj.sessionTrialIdx = [obj.sessionTrialIdx trialOffset(i) + idx(:)'];
                 
                 if isempty(trial_)
                     continue
@@ -62,26 +66,26 @@ classdef csdFlash < handle
     end
     
     methods (Static)
-        function trial = importPDS(PDS)
+        function [trial,display,trialIdx] = importPDS(PDS)
             
             pdsDate = PDS.initialParametersMerged.session.initTime;
             
             if pdsDate > datenum(2018,02,01)
-                trial = session.csdFlash.importPDS_v2(PDS);
+                [trial,display,trialIdx] = session.csdFlash.importPDS_v2(PDS);
             else
-                trial = session.csdFlash.importPDS_v1(PDS);
+                [trial,display,trialIdx] = session.csdFlash.importPDS_v1(PDS);
             end
                 
         end
         
-        function csdTrial = importPDS_v2(PDS)
+        function [csdTrial,display,stimTrials] = importPDS_v2(PDS)
             csdTrial = struct();
             
             % --- find CSD flash trials
             stim = 'csdFlash';
             
             trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
-            
+            display = [];
             stimTrials = find(trialIx);
             
             for j = 1:numel(stimTrials)
@@ -112,14 +116,14 @@ classdef csdFlash < handle
             
         end
            
-        function csdTrial = importPDS_v1(PDS)
+        function [csdTrial,display,stimTrials] = importPDS_v1(PDS)
             csdTrial = struct();
             
             % --- find CSD flash trials
             stim = 'csdFlash';
             
             trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
-            
+            display = [];
             stimTrials = find(trialIx);
             
             for j = 1:numel(stimTrials)
@@ -129,6 +133,7 @@ classdef csdFlash < handle
                 
                 csdTrial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1));
                 csdTrial(kTrial).start      = csdTrial(kTrial).frameTimes(1);
+                csdTrial(kTrial).stop       = csdTrial(kTrial).frameTimes(end);
                 csdTrial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - csdTrial(kTrial).start;
                 
                 csdTrial(kTrial).on         = PDS.data{thisTrial}.(stim).on;

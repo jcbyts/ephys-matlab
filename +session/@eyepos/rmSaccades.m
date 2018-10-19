@@ -36,13 +36,17 @@ p.addParameter('debug',true,@(x) validateattributes(x,{'logical'},{'scalar'}));
 
 % argments passed through for saccade detection...
 p.addParameter('sargs',{},@iscell);
-
+p.addParameter('idx', [])
 p.parse(args{:});
 
 args = p.Results;
 
-% find saccades
-[~,~,idx] = d.findSaccades(args.sargs{:});
+if ~isempty(args.idx)
+    idx = args.idx;
+else
+    % find saccades
+    [~,~,idx] = d.findSaccades(args.sargs{:});
+end
 
 if isempty(idx)
     return

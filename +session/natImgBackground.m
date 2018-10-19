@@ -6,6 +6,7 @@ classdef natImgBackground < handle
         numTrials
         trial
         display
+        sessionTrialIdx=[]
     end
     
     methods
@@ -15,7 +16,8 @@ classdef natImgBackground < handle
             % --- find CSD flash trials
             stim = 'natImgBackground';
             
-            hasStim = io.findPDScontainingStimModule(PDS, stim);
+            [hasStim, numTrialsPerPDS] = io.findPDScontainingStimModule(PDS, stim);
+            trialOffset = [0; cumsum(numTrialsPerPDS)];
             
             if ~any(hasStim)
                 return
@@ -26,7 +28,8 @@ classdef natImgBackground < handle
             
             for i = find(hasStim(:)')
                 
-                trial_ = obj.importPDS(PDS{i});
+                [trial_, ~, idx] = obj.importPDS(PDS{i});
+                obj.sessionTrialIdx = [obj.sessionTrialIdx trialOffset(i) + idx(:)'];
                 
                 if isempty(trial_) || isempty(fieldnames(trial_))
                     continue
@@ -43,7 +46,7 @@ classdef natImgBackground < handle
     end
     
     methods (Static)
-        function trial = importPDS(PDS)
+        function [trial, display, trialIdx] = importPDS(PDS)
             % importPDS checks which version of to stimulus code was run
             % and imports to a common format appropriately
             
@@ -53,7 +56,7 @@ classdef natImgBackground < handle
                 if any(strfind(PDS.initialParametersMerged.git.pep.status, 'branch cleanup'))
                     
                     if pdsDate > datenum(2018, 02, 01)
-                        trial = session.natImgBackground.importPDS_v2(PDS);
+                        [trial, display, trialIdx] = session.natImgBackground.importPDS_v2(PDS);
                     else
                         error('unknown version')
                     end
@@ -61,22 +64,22 @@ classdef natImgBackground < handle
                 else
                    warning('natImgBackground: git tracking failed. using version 2 import')
                    try
-                       trial = session.natImgBackground.importPDS_v2(PDS);
+                       [trial, display, trialIdx] = session.natImgBackground.importPDS_v2(PDS);
                    catch
                        error('version 2 import failed')
                    end
                 end
             else
-                trial = session.natImgBackground.importPDS_v1(PDS);
+                [trial, display, trialIdx] = session.natImgBackground.importPDS_v1(PDS);
             end
         end
         
-        function trial = importPDS_v2(PDS)
+        function [trial, display, stimTrials] = importPDS_v2(PDS)
             trial = struct();
             
             % --- find CSD flash trials
             stim = 'natImgBackground';
-            
+            display = [];
             trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
             
             stimTrials = find(trialIx);
@@ -125,16 +128,30 @@ classdef natImgBackground < handle
         end
            
         
-        function trial = importPDS_v1(PDS)
+        function [trial, display, stimTrials] = importPDS_v1(PDS)
             trial = struct();
-            
+            display = [];
             % --- find CSD flash trials
             stim = 'natImgBackground';
             
             trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
             
             stimTrials = find(trialIx);
+            d = pds.getPdsTrialData(PDS);
             
+            imgDirs = unique(arrayfun(@(x) x.natImgBackground.imgDir, d(:), 'uni', 0));
+            assert(numel(imgDirs)==1, 'I only implemented handling one img directory per PDS file')
+            % look for known image directories
+            
+            
+            knownImageDirs = dir('Z:\Data\ImageDatabank');
+            knownImageDirs(1:2) = [];
+            knownImageDirs = knownImageDirs([knownImageDirs.isdir]);
+            
+            id = (arrayfun(@(x) any(strfind(imgDirs{1}, x.name)), knownImageDirs));
+            imgDir = knownImageDirs(id);
+            
+
             for j = 1:numel(stimTrials)
                 thisTrial = stimTrials(j);
                 
@@ -142,9 +159,19 @@ classdef natImgBackground < handle
                 
                 trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1));
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).stop      = trial(kTrial).frameTimes(end);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
-                trial(kTrial).imgIdx     = PDS.data{thisTrial}.(stim).imgIndex(PDS.data{thisTrial}.(stim).texShown(1:end-1));
-
+                imgIdx     = PDS.data{thisTrial}.(stim).imgIndex(PDS.data{thisTrial}.(stim).texShown(1:end-1));
+                
+                uniqueImages = unique(imgIdx);
+                imagesShown = d(thisTrial).(stim).fileList(uniqueImages);
+                nImagesShown = numel(imagesShown);
+                trial(kTrial).images = cell(nImagesShown,1);
+                for i = 1:nImagesShown
+                    trial(kTrial).images{i} = imread(fullfile(imgDir.folder, imgDir.name, imagesShown(i).name));
+                    trial(kTrial).imgIdx = imgIdx==uniqueImages(i);
+                end
+                    
             end
             
             % TODO: actually link to images
