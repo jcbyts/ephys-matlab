@@ -125,7 +125,7 @@ sess = io.loadSession(oepath);
 
 % important!! make sure you are on the right version of the stimulus code
 overwrite = ip.Results.overwrite; % if it breaks, run again with true
-PDS = io.getPds(sess, overwrite);
+PDS = io.getPds(sess, overwrite, true); % force all PDS files
 
 if isempty(PDS)
     warning('No PDS files were found. missing PDS files?')
