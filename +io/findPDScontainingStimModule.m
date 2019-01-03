@@ -20,6 +20,7 @@ for i = 1:numel(PDS)
     nTrials(i) = numel(trial);
     
     if isfield(trial, stim)
-        hasStim(i) = any(arrayfun(@(x) x.(stim).use, trial));
+        idx = arrayfun(@(x) ~isempty(x.(stim)), trial);
+        hasStim(i) = any(arrayfun(@(x) x.(stim).use, trial(idx)));
     end
 end
