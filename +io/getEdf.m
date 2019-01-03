@@ -88,7 +88,9 @@ nPds = numel(PDS);
 
 for kPds = 1:nPds
     
-%     try
+    try
+    [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
+    fprintf('Reading [%s] \n', edfFile)
     [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds});
     fwrite(fidout, dataRAW', '*uint16')
     
@@ -97,13 +99,32 @@ for kPds = 1:nPds
     elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
     elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
     elInfo.bitDeg       = el_info.bitDeg;
-%     catch
-%         warning('no edf data for PDS %d', kPds)
-%     end
+    catch
+        try
+        fprintf('Trying for backup edf file\n')
+%         [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
+        edfFile = PDS{kPds}.initialParametersMerged.eyelink.edfFile;
+        fprintf('Reading [%s] \n', edfFile)
+        [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds}, edfFile);
+        fwrite(fidout, dataRAW', '*uint16');
+        
+        elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
+        elInfo.fragments    = [elInfo.fragments el_info.fragments];
+        elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
+        elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
+        elInfo.bitDeg       = el_info.bitDeg;
+        catch
+            warning(me.identifier, me.message)
+            warning('no edf data for PDS %d [%s]', kPds, edfFile)
+        end
+    end
     
 end
 
 elInfo.sampleRate = unique(elInfo.sampleRate);
+if numel(elInfo.sampleRate)~=1
+    keyboard
+end
 assert(numel(elInfo.sampleRate)==1, 'Eyelink sample rate changed throughout session. This is not supported')
 
 fclose(fidout);
@@ -135,9 +156,11 @@ end
 
 end
 
-function [data, timestamps, info] = getEdfData(sess, PDS)
+function [data, timestamps, info] = getEdfData(sess, PDS, edfFile)
 
-
+if nargin < 3
+	[~, edfFile, ~] = fileparts(PDS.initialParametersMerged.session.file);
+end
 
 assert(PDS.initialParametersMerged.eyelink.useRawData, 'This import is only designed for raw data + calibration matrix')
 if ~isfield(PDS, 'initialParameters')
@@ -170,7 +193,6 @@ ElTimeCmChanged = [0 cellfun(@(x) x.timing.eyelinkStartTime(2), PDS.data(calibMa
 eyeIdx = PDS.initialParametersMerged.eyelink.eyeIdx;
 
 
-[~, edfFile, ~] = fileparts(PDS.initialParametersMerged.session.file);
 
 elFile=fullfile(sess.path, [edfFile '.edf']);
 hasEdf=exist(elFile, 'file');
