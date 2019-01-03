@@ -196,7 +196,7 @@ for k = 1:nBlocks
             stops = find(round(diff(info_.header.sampleRate*timestamps_seg))~=1);
             
             if any(stops)
-                ts_ = [ts_ timestamps_seg(stops)'];
+                ts_ = [ts_ timestamps_seg(stops+1)'];
                 ns_ = diff([0 stops(:)' ns_]);
                 
                 % Uncomment this if debugging timestamps
