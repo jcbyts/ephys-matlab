@@ -1,16 +1,18 @@
-function PDS = getPds(sessionInfo, overwrite, includeBadSyncs)
+function PDS = getPds(sessionInfo, overwrite, forceAll)
 % GET PDS loads PLDAPS files and synchronizes with the OE clock
 % Inputs:
 %   SessionInfo@struct - session info struct from io.loadSession(oepath)
+%   overwrite@logical  - flag
+%   includeBadSyncs@logical - keep sessions that aren't matched with ephys
 % Outputs:
 %   PDS@cell    - array of PDS structs
 % Example call:
-%   PDS = io.getPds(sessionInfo)
+%   PDS = io.getPds(sessionInfo, overwrite, includeBadSyncs)
 
 % 2017.08.14    jly     wrote it
 
 if nargin < 3
-    includeBadSyncs = false;
+    forceAll = false;
     if nargin < 2
         overwrite = false;
     end
@@ -39,7 +41,7 @@ nPdsFiles = numel(pdsList);
 
 PDS = cell(nPdsFiles,1);
 fprintf('Found [%d] PDS files\n', nPdsFiles)
-fprintf('Aligning with OE clock now\n')
+
 
 reconError = nan(nPdsFiles,1);
 
@@ -63,9 +65,14 @@ for kPdsFile = 1:nPdsFiles
         curr_branch = branch{1};
         assert(strcmp(data_branch, curr_branch), 'You are on the wrong branch of PEP')
     else
-        old_pep_path = 'C:\Users\Jake\Repos\pds-stimuli-pldapsGUI\';
+        reposDir = getpref('ephysmatlab', 'repos');
+        old_pep_path = fullfile(reposDir, 'pds-stimuli-pldapsGUI\');
         addpath(old_pep_path)
+        % reload PDS file
+        tmp = load(pdsList{kPdsFile}, '-mat');
     end
+    
+   
     
     if ~isempty(tmp.PDS.functionHandles)
         fhlist = fieldnames(tmp.PDS.functionHandles);
@@ -76,33 +83,44 @@ for kPdsFile = 1:nPdsFiles
         end
     end
     
-    % --- Synchronize the clocks ------------------------------------------
-    [OE2PTBfit, ~,PTB2OE, maxreconstructionerror] = io.sync2OeClock(tmp.PDS, evList);
-    
-    tmp.PDS.PTB2OE    = PTB2OE;
-    tmp.PDS.OE2PTBfit = OE2PTBfit;
-    tmp.PDS.maxreconstructionerror = maxreconstructionerror;
-    
-    if isempty(maxreconstructionerror)
-        fprintf('%d) No Ephys Data\n', kPdsFile);
-    else
-        fprintf('%d) Strobe times aligned. Max reconstruction error is %2.3f ms\n', kPdsFile, maxreconstructionerror*1e3)
-        reconError(kPdsFile) = maxreconstructionerror*1e3;
+    if ~forceAll
+        % --- Synchronize the clocks ------------------------------------------
+        [OE2PTBfit, ~,PTB2OE, maxreconstructionerror] = io.sync2OeClock(tmp.PDS, evList);
+        
+        tmp.PDS.PTB2OE    = PTB2OE;
+        tmp.PDS.OE2PTBfit = OE2PTBfit;
+        tmp.PDS.maxreconstructionerror = maxreconstructionerror;
+        
+        if isempty(maxreconstructionerror)
+            fprintf('%d) No Ephys Data\n', kPdsFile);
+        else
+            fprintf('%d) Strobe times aligned. Max reconstruction error is %2.3f ms\n', kPdsFile, maxreconstructionerror*1e3)
+            reconError(kPdsFile) = maxreconstructionerror*1e3;
+        end
+        
     end
-    
     
     PDS{kPdsFile} = tmp.PDS;
 end
 
+fprintf('Aligning with OE clock now\n')
 
-badSync = reconError > .1;
-if any(badSync)
-    keyboard
-end
-noEphys = cellfun(@(x) isempty(x.maxreconstructionerror), PDS);
-if includeBadSyncs
-    PDS(noEphys) = [];
+if forceAll
+    
+    trial = pds.getPdsTrialData(PDS);
+    % --- Synchronize the clocks ------------------------------------------
+    fprintf('Forcing all PDS files to be synced together\n')
+    [OE2PTBfit, ~,PTB2OE, maxreconstructionerror] = io.sync2OeClock_trial(trial, evList);
+    fprintf('Strobe times aligned. Max reconstruction error is %2.3f ms\n', maxreconstructionerror*1e3)
+    
+    for kPdsFile = 1:numel(PDS)
+        PDS{kPdsFile}.OE2PTBfit = OE2PTBfit;
+        PDS{kPdsFile}.PTB2OE = PTB2OE;
+        PDS{kPdsFile}.maxreconstructionerror = maxreconstructionerror;
+    end
 else
+    badSync = reconError > .1;
+    noEphys = cellfun(@(x) isempty(x.maxreconstructionerror), PDS);
     PDS(noEphys | badSync) = [];
 end
 
