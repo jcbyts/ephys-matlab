@@ -58,7 +58,7 @@ LOW_CUTOFF  = 300;
 ARTIFACT_SD = 5; % reject anything outside
 LINE_NOISE_FREQ = [60 120 180];
 NEW_FS = 1e3;
-OE_HIGHPASS = 1;
+OE_HIGHPASS = 0.1;
 CHUNK_SIZE = 1000; % seconds
 
 % --- begin analysis
