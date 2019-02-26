@@ -1,12 +1,9 @@
 function addEphysMatlab
 pathto = fileparts(mfilename('fullpath'));
 
-addpath(pathto)
-addpath(fullfile(pathto, 'utils'))
-addpath(fullfile(pathto, 'utils', 'edfmex'))
-
 % --- List of paths that are required
-reposDir = 'C:\Users\Jake\Repos';
+% reposDir = 'C:\Users\Jake\Repos';
+reposDir = getpref('ephysmatlab', 'repos');
 kDir = 1;
 dirs{kDir} = fullfile(reposDir, 'KiloSort');
 kDir = kDir + 1;
@@ -19,7 +16,7 @@ kDir = kDir + 1;
 dirs{kDir} = fullfile(reposDir, 'analysis-tools'); % open ephys tools
 
 
-reposDir = getpref('ephysmatlab', 'repos');
+
 % kDir = kDir + 1;
 % dirs{kDir}  = fullfile(reposDir, 'scalablerf'); % for receptive field estimation
 % kDir = kDir + 1;
@@ -52,4 +49,7 @@ for j=1:length(dirs)
     end
 end
 
+addpath(pathto)
+addpath(fullfile(pathto, 'utils'))
+addpath(fullfile(pathto, 'utils', 'edfapi'))
 % warning on
