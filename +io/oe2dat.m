@@ -266,13 +266,13 @@ save(ops.chanMap, 'chanMap', 'xcoords', 'ycoords', 'zcoords', 'connected', 'fs')
 % end
 
 % default number of clusters
-ops.Nfilt               = 6*(ops.Nchan+32-mod(ops.Nchan,32));  % number of clusters to use (2-4 times more than Nchan, should be a multiple of 32)     		
-ops.nNeighPC            = 8; % visualization only (Phy): number of channnels to mask the PCs, leave empty to skip (12)		
-ops.nNeigh              = 8; % visualization only (Phy): number of neighboring templates to retain projections of (16)		
+ops.Nfilt               = 2*(ops.Nchan+32-mod(ops.Nchan,32));  % number of clusters to use (2-4 times more than Nchan, should be a multiple of 32)     		
+ops.nNeighPC            = 12; % visualization only (Phy): number of channnels to mask the PCs, leave empty to skip (12)		
+ops.nNeigh              = 12; % visualization only (Phy): number of neighboring templates to retain projections of (16)		
 		
 % options for channel whitening		
-ops.whitening           = 'noSpikes'; % type of whitening (default 'full', for 'noSpikes' set options for spike detection below)		
-ops.nSkipCov            = 1; % compute whitening matrix from every N-th batch (1)		
+ops.whitening           = 'full'; % type of whitening (default 'full', for 'noSpikes' set options for spike detection below)		
+ops.nSkipCov            = 2; % compute whitening matrix from every N-th batch (1)		
 ops.whiteningRange      = 32; % how many channels to whiten together (Inf for whole probe whitening, should be fine if Nchan<=32)		
 		
 ops.criterionNoiseChannels = 0.2; % fraction of "noise" templates allowed to span all channel groups (see createChannelMapFile for more info). 		
@@ -296,8 +296,8 @@ ops.NT                  = 2*128*1024+ ops.ntbuff;% this is the batch size (try d
 % the following options can improve/deteriorate results. 		
 % when multiple values are provided for an option, the first two are beginning and ending anneal values, 		
 % the third is the value used in the final pass. 		
-ops.Th               = [6 12 12];    % threshold for detecting spikes on template-filtered data ([6 12 12])		
-ops.lam              = [10 30 30];   % large means amplitudes are forced around the mean ([10 30 30])		
+ops.Th               = [4 10 10];    % threshold for detecting spikes on template-filtered data ([6 12 12])		
+ops.lam              = [5 5 5];   % large means amplitudes are forced around the mean ([10 30 30])		
 ops.nannealpasses    = 4;            % should be less than nfullpasses (4)		
 ops.momentum         = 1./[20 1000];  % start with high momentum and anneal (1./[20 1000])		
 ops.shuffle_clusters = 1;            % allow merges and splits during optimization (1)		
