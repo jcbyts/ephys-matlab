@@ -18,8 +18,8 @@ end
 dataRAW = io.loadRaw(ops, [], false);
 dataRAW = double(dataRAW');
 
-% common average reference
-dataRAW = bsxfun(@minus, dataRAW, mean(dataRAW,2));
+% % common average reference
+% dataRAW = bsxfun(@minus, dataRAW, mean(dataRAW,2));
     
 % filter
 datr = filter(b1, a1, dataRAW);

@@ -244,7 +244,7 @@ preprocess.save_filtered_data(ops);
 % 13) Run the automatic merge
 if merge
     fprintf('Attemptying Automerge\n')
-    rez                = merge_posthoc3(rez);
+    rez                = merge_posthoc6(rez);
     fprintf('saving python files for Phy\n')
     % save python results file for Phy
     rezToPhy(rez, ops.root);
