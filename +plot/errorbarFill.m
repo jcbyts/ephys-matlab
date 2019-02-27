@@ -1,4 +1,4 @@
-function fh = errorbarFill(fillX, fillmean, fillwidth, varargin)
+function varargout = errorbarFill(fillX, fillmean, fillwidth, varargin)
 % Make "filled" error bar region (alternative to  'errorbar');
 %
 % fh = errorbarFill(fillX, fillmean, fillwidth, fillcolor, {plot args})
@@ -30,3 +30,19 @@ end
 
 fillX = fillX(:)'; fillmean = fillmean(:)'; fillwidth = fillwidth(:)';
 fh = fill([fillX fliplr(fillX)], [fillmean(:)' fliplr(fillmean(:)')] + [fillwidth -fliplr(fillwidth)], varargin{:});
+
+holdstatus = ishold(gca);
+
+hold on
+ix = find(strcmp(varargin, 'FaceColor'));
+if ~isempty(ix)
+    plot(fillX, fillmean, 'Color', varargin{ix+1});
+end
+
+if ~holdstatus
+    hold off
+end
+
+if nargout > 0
+    varargout{1} = fh;
+end
