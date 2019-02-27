@@ -1,4 +1,4 @@
-function [tstart,tend,idx,vel,acc] = findSaccades(d,varargin)
+function saccades = findSaccades(d,varargin)
 % Find saccades in eye position signals...
 %
 % Available arguments include:
@@ -56,7 +56,7 @@ speed = hypot(vel.x,vel.y);
 a = 1;
 b = ones(1,2*N+1)./(2*N+1);
 baseline = locfilt(b,a,speed);
-baseline = circshift(baseline,N); % delay by half filter length
+% baseline = circshift(baseline,N); % delay by half filter length
 
 % scalar eye acceleration
 accel = fs*locfilt(coeffs,1,speed);
@@ -84,9 +84,9 @@ if isempty(idx)
     return
 end
 
-% sanity check...
-k = bsxfun(@minus,idx,[1:args.dt*fs]-1);
-idx(~any(sign(fix(accel(k')./args.accthresh)) > 0,1)) = [];
+% % sanity check...
+% k = bsxfun(@minus,idx,[1:args.dt*fs]-1);
+% idx(~any(sign(fix(accel(k')./args.accthresh)) > 0.1)) = [];
 
 n = ceil(args.isi*fs); % samples
 
@@ -131,6 +131,7 @@ for ii = 1:size(idx,1)
     tmp = speed(t0:t1) - args.velthresh;
     
     if args.debug
+        clear fh
         for jj = 1:2
             subplot(2,1,jj);
             
@@ -221,6 +222,7 @@ for ii = 1:size(idx,1)
     if args.debug
         xx = t(idx(ii,[1,3,3,1]));
         arrayfun(@(h) set(h,'XData',xx),fh);
+        drawnow
     end
     
 end
@@ -228,6 +230,38 @@ end
 tstart = t(idx(:,1));
 tend = t(idx(:,3));
 idx(:,2) = [];
+
+saccades = struct();
+saccades.tstart = tstart(:);
+saccades.tend   = tend(:);
+saccades.duration = saccades.tend- saccades.tstart;
+saccades.startIndex = idx(:,1);
+saccades.endIndex   = idx(:,end);
+saccades.startXpos  = d.x(saccades.startIndex);
+saccades.startYpos  = d.y(saccades.startIndex);
+saccades.endXpos  = d.x(saccades.endIndex);
+saccades.endYpos  = d.y(saccades.endIndex);
+saccades.dX     = saccades.endXpos - saccades.startXpos;
+saccades.dY     = saccades.endYpos - saccades.startYpos;
+saccades.size   = sqrt(saccades.dX.^2 + saccades.dY.^2);
+n = numel(saccades.tstart);
+saccades.vel    = zeros(n, 1);
+for i = 1:n
+   saccades.vel(i) = max(speed(saccades.startIndex(i):saccades.endIndex(i)) );
+end
+
+
+%   result (struct)
+%       .tstart         saccade start time
+%       .tend           saccade end time
+%       .duration      saccade duration
+%       .size          saccade size
+%       .startXpos     x position at start
+%       .startYpos     y position at start
+%       .endXpos       x position at end
+%       .endYpos       y position at end
+%       .startIndex    start index (into data trace)
+%       .endIndex      end index
 
 % vel = speed;
 acc = accel;
