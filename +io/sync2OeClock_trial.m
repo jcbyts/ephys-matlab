@@ -157,6 +157,29 @@ if verbose
     fprintf('%d strobes match\n', sum(goodPTBindex))
 end
 
+ptbTs = sixletsPTBts(goodPTBindex,:);
+oeTs  = sixletsOEts(hind(goodPTBindex),:);
+ptbTs = ptbTs(:);
+oeTs = oeTs(:);
+
+OE2PTBfit=[oeTs(:) ones(numel(oeTs),1)]\ptbTs(:);
+% OE2PTB=@(x) x*OE2PTBfit(1) + OE2PTBfit(2);
+PTB2OE=@(x) (x - OE2PTBfit(2))/OE2PTBfit(1);
+
+if mean(goodPTBindex) > 0.5
+    PTB2OEfit = OE2PTBfit;
+    d = oeTs - PTB2OE(ptbTs);
+
+    plot(oeTs, d*1e3, '.')
+    ylim([-1 1])
+    ylabel('error (ms)')
+    xlabel('oe timestamp')
+    OE2PTBfit = [];
+    maxreconstructionerror = max(abs(d));
+    fprintf('%d strobes match\n', sum(goodPTBindex))
+    fprintf('exiting\n')
+    return
+end
 
     %% over half the strobes are missing
 if mean(goodPTBindex) < 0.5 && isempty(intersect(unique(bitNumber), 5))
@@ -289,9 +312,7 @@ subplot(1,2,1)
 plot(ptbTs, oeTs, '.'); hold on
 xlabel('PTB clock')
 ylabel('OE clock')
-% OE2PTBfit=[oeTs(:) ones(numel(oeTs),1)]\ptbTs(:);
-% OE2PTB=@(x) x*OE2PTBfit(1) + OE2PTBfit(2);
-% PTB2OE=@(x) (x - OE2PTBfit(2))/OE2PTBfit(1);
+
 
 xx = linspace(min(ptbTs), max(ptbTs), 100);
 plot(xx, PTB2OE(xx), 'r')

@@ -50,7 +50,7 @@ ip.parse(varargin{:})
 nd = numel(dims);
 switch nd
     case 1
-        Cinv = qfsmooth1D(nd);
+        Cinv = qfsmooth1D(dims(1));
     case 2
         Cinv = qfsmooth2D(dims(2), dims(1));
     case 3
@@ -58,19 +58,27 @@ switch nd
     otherwise
         error('spatialRfAutoSmooth: number of dimensions must be 1 , 2, or 3')
 end
+Cinv = Cinv + 5*eye(size(Cinv,1)); % add ridge parameter
+
+constCols = var(X)==0;
+Cinv(constCols,:) = [];
+Cinv(:,constCols) = [];
+X(:,constCols) = [];
 
 % if including a bias term, augment with a column of ones
 if ip.Results.addDC
     X = [X ones(nobs,1)];
-    npred = npred + 1;
+%     npred = npred + 1;
     Cinv = blkdiag(Cinv, .1); 
 end
+
 
 % use cross validation to estimate the hyper parameters
 if ip.Results.crossvalidation
     
     nFolds = ip.Results.nFolds;
     folds = xvalidationIdx(nobs, nFolds, true);
+    nFolds = 1;
     best_lambda = zeros(nFolds, nneuron);
     r2_fold     = zeros(nFolds, nneuron);
     
@@ -122,7 +130,11 @@ if ip.Results.crossvalidation
         
     end
     
+    if nFolds > 1
     lambdaMax = median(best_lambda);
+    else
+        lambdaMax = best_lambda;
+    end
 else
     lambdaMax = ip.Results.lambda0*ones(1,nneuron);
 end
@@ -133,9 +145,10 @@ XX = X'*X;
 XY = X'*y;
 ny = size(y,1);
 
-B = zeros(npred, nneuron);
+
 nsevar = zeros(1,nneuron);
 k = size(X,2);
+B = zeros(k, nneuron);
 se = zeros(k, nneuron);
 for i = 1:nneuron
     yy = y(:,i)'*y(:,i);
@@ -148,11 +161,24 @@ for i = 1:nneuron
     se(:,i) = diag(BB);
 end
 
+if any(constCols)
+    w = nan(numel(constCols)+ip.Results.addDC, nneuron);
+    se2 = nan(size(se));
+    ix = [~constCols(:); ip.Results.addDC];
+    for i = 1:nneuron
+        w(ix,i) = B(:,i);
+        se2(ix,i) = se(:,i);
+    end
+else
+    w = B;
+    se2 = se;
+end
+        
 % save out some details
 params = ip.Results;
 params.nsevar = nsevar;
-params.se = se;
-params.w  = B;
+params.se = se2;
+params.w  = w;
 params.lambdaMax = lambdaMax;
 if ip.Results.crossvalidation
     params.fold_lambda = best_lambda;

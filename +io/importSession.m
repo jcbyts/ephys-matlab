@@ -116,7 +116,7 @@ for iDir = 1:numel(derived)
 end
 
 disp('Converting the Open Ephys files to a single binary file.')
-io.oe2dat(oepath, shank, 'overwrite', false, 'verbose', true);
+io.oe2dat(oepath, shank, 'overwrite', ip.Results.overwrite, 'verbose', true);
 
 thisSession.oe2dat = true;
 

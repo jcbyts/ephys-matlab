@@ -224,7 +224,11 @@ purs = struct('tstart', pursuit_start,...
     'dy', nan(nPursuit, 1));
 
 purs.startIndex = arrayfun(@(x) find((tsample - x)>=0, 1), pursuit_start);
-purs.endIndex   = arrayfun(@(x) find((tsample - x)>=0, 1), pursuit_end);
+tmp = arrayfun(@(x) find((tsample - x)>=0, 1), pursuit_end, 'uni', 0);
+bad = cellfun(@isempty, tmp);
+
+purs.startIndex = purs.startIndex(~bad);
+purs.endIndex   = cell2mat(tmp(~bad));
 purs.startXpos = x(purs.startIndex);
 purs.startYpos = y(purs.startIndex);
 purs.endXpos   = x(purs.endIndex);

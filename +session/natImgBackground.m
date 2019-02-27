@@ -80,28 +80,12 @@ classdef natImgBackground < handle
             % --- find CSD flash trials
             stim = 'natImgBackground';
             display = [];
-            trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
+            pdstrial = pds.getPdsTrialData(PDS);
+            
+            trialIx = arrayfun(@(x) x.(stim).use, pdstrial);
             
             stimTrials = find(trialIx);
             
-            % --- check for conditions
-            % if we were using pldaps modular features, it is likely that
-            % some trials do not include the hartley stimulus. Those trials
-            % would've been set by the condition field of pldaps. Check for
-            % the use of conditions and then check if hartley was used.
-            if ~isempty(PDS.conditions)
-                condIx = cellfun(@(x) isfield(x, stim), PDS.conditions(stimTrials));
-                
-                if any(condIx) % conditions were used (ignore trials that hartley wasn't shown)
-                    
-                    notUsed = cellfun(@(x) x.(stim).use==0, PDS.conditions(stimTrials(condIx)));
-                    
-                    trialList = stimTrials(condIx);
-                    excludeTrials = trialList(notUsed);
-                    
-                    stimTrials = setdiff(stimTrials, excludeTrials);
-                end
-            end
             
             if isempty(stimTrials)
                 return
@@ -168,7 +152,9 @@ classdef natImgBackground < handle
                 nImagesShown = numel(imagesShown);
                 trial(kTrial).images = cell(nImagesShown,1);
                 for i = 1:nImagesShown
-                    trial(kTrial).images{i} = imread(fullfile(imgDir.folder, imgDir.name, imagesShown(i).name));
+                    % TODO: this should be optional -- reading this image
+                    % in is huge
+%                     trial(kTrial).images{i} = imread(fullfile(imgDir.folder, imgDir.name, imagesShown(i).name));
                     trial(kTrial).imgIdx = imgIdx==uniqueImages(i);
                 end
                     

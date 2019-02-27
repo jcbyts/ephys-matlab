@@ -33,7 +33,7 @@ for i = 1:nNeurons
     zi = RF(:,i) / max(RF(:,i));
     zi = reshape(zi, stim.size);
     results(i).gaussian = autoGaussianSurf(xi,yi,zi,opts);
-    results(i).gabor    = autoGaborSurf(xi, yi,zi, opts);
+%     results(i).gabor    = autoGaborSurf(xi, yi,zi, opts);
 end
 
 
@@ -331,7 +331,7 @@ function [results] = autoGaussianSurf(xi,yi,zi,opts)
     if opts.positive
         lb(1) = 0;
     end
-    
+    zi(isnan(zi)) = 0;
     results = doFinalOptimization(thefun,[xi(:),yi(:)],zi(:),params0,lb,ub,true(length(lb),1),varnames,iscircular,opts);
     
     %Collect the results

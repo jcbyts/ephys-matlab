@@ -15,12 +15,12 @@ classdef squareFlash < handle
             % PDS is a PDS struct or cell array of PDS structs
             %
             % Optional Arguments:
-            %   'eyetrace' [n x 4]  the raw eye position data 
+            %   'eyetrace' [n x 4]  the raw eye position data
             %                       col 1: timestamp
             %                       col 2: x position (degrees)
             %                       col 3: y position (degrees)
             %                       col 4: pupil
-
+            
             % parse optional arguments
             ip = inputParser();
             ip.addOptional('eyetrace', [])
@@ -31,7 +31,7 @@ classdef squareFlash < handle
             
             stim = 'SpatialMapping'; % this is the name we use during data colletion. It should always be the same!
             
-             
+            
             if isstruct(PDS)
                 PDS = {PDS};
             end
@@ -47,7 +47,7 @@ classdef squareFlash < handle
             % assuming the display parameters didn't change during the
             % session, store them in the object
             h.display = PDS{find(hasStim,1)}.initialParametersMerged.display;
-
+            
             % Loop over PDS files, importing the stimulus parameters
             for i = find(hasStim(:)')
                 
@@ -68,74 +68,76 @@ classdef squareFlash < handle
             % --- import eye position
             eyepos = ip.Results.eyetrace;
             if ~isempty(eyepos)
-               if size(eyepos,2) < size(eyepos,1)
-                   eyepos = eyepos';
-               end
-               
-               assert(size(eyepos,1) >= 3, 'the first row must be timestamps')
-               
-               if ~isstruct(ip.Results.saccades)% detect saccades
-                   sampleRate = 1/mode(diff(eyepos(1,:)));
-                   ix = ~any(isnan(eyepos(2,:)));
-                   [saccades] = pdsa.detectSaccades(eyepos(1,ix), eyepos(2:3,ix), ...
-                       'verbose', false, ...
-                       'filterPosition', 1, ...
-                       'filterLength', ceil(20/sampleRate*1e3), ... % 40 ms smoothing for velocity computation
-                       'detectThresh', 200, ...
-                       'startThresh', 5, ...
-                       'minIsi', ceil(30/sampleRate*1e3), ...
-                       'minDur', ceil(4/sampleRate*1e3), ... % 4 ms
-                       'blinkIsi', ceil(40/sampleRate*1e3));
-               else
-                   saccades = ip.Results.saccades;
-               end
-               
-               if size(eyepos,1) >= 4
-                   pupil = eyepos(4,:);
-               else
-                   pupil = [];
-               end
-               
-               % Loop over trials and add eye position
-               for kTrial = 1:h.numTrials
-                   
-                   % include time before the trial starts
-                   preTrial = ip.Results.eyePosPreTrial;
-                   
-                   % find valid eye position
-                   iix = (eyepos(1,:) > (h.trial(kTrial).start - preTrial)) & (eyepos(1,:) < (h.trial(kTrial).start + h.trial(kTrial).duration));
-                   h.trial(kTrial).eyeSampleTime = eyepos(1,iix);
-                   h.trial(kTrial).eyeXDeg = eyepos(2,iix);
-                   h.trial(kTrial).eyeYDeg = eyepos(3,iix);
-                   if ~isempty(pupil)
+                if size(eyepos,2) < size(eyepos,1)
+                    eyepos = eyepos';
+                end
+                
+                assert(size(eyepos,1) >= 3, 'the first row must be timestamps')
+                
+                if ~isstruct(ip.Results.saccades)% detect saccades
+                    sampleRate = 1/mode(diff(eyepos(1,:)));
+                    ix = ~any(isnan(eyepos(2,:)));
+                    [saccades] = pdsa.detectSaccades(eyepos(1,ix), eyepos(2:3,ix), ...
+                        'verbose', false, ...
+                        'filterPosition', 1, ...
+                        'filterLength', ceil(20/sampleRate*1e3), ... % 40 ms smoothing for velocity computation
+                        'detectThresh', 200, ...
+                        'startThresh', 5, ...
+                        'minIsi', ceil(30/sampleRate*1e3), ...
+                        'minDur', ceil(4/sampleRate*1e3), ... % 4 ms
+                        'blinkIsi', ceil(40/sampleRate*1e3));
+                else
+                    saccades = ip.Results.saccades;
+                end
+                
+                if size(eyepos,1) >= 4
+                    pupil = eyepos(4,:);
+                else
+                    pupil = [];
+                end
+                
+                % Loop over trials and add eye position
+                for kTrial = 1:h.numTrials
+                    
+                    % include time before the trial starts
+                    preTrial = ip.Results.eyePosPreTrial;
+                    
+                    % find valid eye position
+                    iix = (eyepos(1,:) > (h.trial(kTrial).start - preTrial)) & (eyepos(1,:) < (h.trial(kTrial).start + h.trial(kTrial).duration));
+                    h.trial(kTrial).eyeSampleTime = eyepos(1,iix);
+                    h.trial(kTrial).eyeXDeg = eyepos(2,iix);
+                    h.trial(kTrial).eyeYDeg = eyepos(3,iix);
+                    if ~isempty(pupil)
                         h.trial(kTrial).pupilArea = pupil(iix);
-                   end
-                   
-                   % valid saccade times
-                   iix = (saccades.start > (h.trial(kTrial).start - preTrial)) & (saccades.end < (h.trial(kTrial).start + h.trial(kTrial).duration));
-                   fields = fieldnames(saccades);
-                   for iField = 1:numel(fields)
-                       newfield = ['sac_' fields{iField}];
-                       h.trial(kTrial).(newfield) = saccades.(fields{iField})(iix);
-                   end
-                   
-                   % update the eye position at frame to use the offline
-                   % estimate
-                   nFrames = numel(h.trial(kTrial).frameTimes);
-                   for iFrame = 1:nFrames
-                       iix = h.trial(kTrial).eyeSampleTime > (h.trial(kTrial).frameTimes(iFrame)) & ( h.trial(kTrial).eyeSampleTime < (h.trial(kTrial).frameTimes(iFrame) +  h.display.ifi));
-                       h.trial(kTrial).eyePosAtFrame(iFrame,:) = [nanmedian(h.trial(kTrial).eyeXDeg(iix)) nanmedian(h.trial(kTrial).eyeYDeg(iix))];
-                   end
-                   
-               end
-
+                    end
+                    
+                    % valid saccade times
+                    iix = (saccades.tstart > (h.trial(kTrial).start - preTrial)) & (saccades.tend < (h.trial(kTrial).start + h.trial(kTrial).duration));
+                    fields = fieldnames(saccades);
+                    for iField = 1:numel(fields)
+                        newfield = ['sac_' fields{iField}];
+                        h.trial(kTrial).(newfield) = saccades.(fields{iField})(iix);
+                    end
+                    
+                    % update the eye position at frame to use the offline
+                    % estimate
+                    nFrames = numel(h.trial(kTrial).frameTimes);
+                    for iFrame = 1:nFrames
+                        iix = h.trial(kTrial).eyeSampleTime > (h.trial(kTrial).frameTimes(iFrame)) & ( h.trial(kTrial).eyeSampleTime < (h.trial(kTrial).frameTimes(iFrame) +  h.display.ifi));
+                        if any(iix)
+                            h.trial(kTrial).eyePosAtFrame(iFrame,:) = [nanmedian(h.trial(kTrial).eyeXDeg(iix)) nanmedian(h.trial(kTrial).eyeYDeg(iix))];
+                        end
+                    end
+                    
+                end
+                
             end
             
             
         end % constructor
         
         function spks = binSpikes(h, stim, sp, units)
-        % spks = binSpikes(h, stim, sp, units)
+            % spks = binSpikes(h, stim, sp, units)
             T = size(stim.X,1);
             spks = zeros(T,1);
             if nargin < 4
@@ -206,7 +208,7 @@ classdef squareFlash < handle
             
             
             flipTimes = cell2mat(arrayfun(@(x) x.frameTimes(:), h.trial(ip.Results.trialIdx), 'UniformOutput', false))';
-                        
+            
             win = ip.Results.window; % convert window into pixels
             
             % check if window has the same size for x and y
@@ -225,22 +227,25 @@ classdef squareFlash < handle
             yax = winy(1):binSize:winy(2);
             [xx,yy] = meshgrid(xax, yax);
             
+            trialIdx = ip.Results.trialIdx;
             % get the dimensions of the space
             sz = size(xx);
-            nTotalFrames = sum(arrayfun(@(x) numel(x.frameTimes), h.trial));
+            nTotalFrames = sum(arrayfun(@(x) numel(x.frameTimes), h.trial(trialIdx)));
             
             
-            h.design.trialIdx = ip.Results.trialIdx;
+            h.design.trialIdx = trialIdx;
             
             frameCounter = 0;
             
             X = zeros(nTotalFrames, prod(sz));
             valid = false(nTotalFrames, 1); % is the frame valid to analyze
             
-            nTrials = numel(h.trial);
-            for kTrial = 1:nTrials
-                fprintf('%d / %d \n', kTrial, nTrials)
-
+            nTrials = numel(trialIdx);
+            for iiT = 1:nTrials
+                fprintf('%d / %d \n', iiT, nTrials)
+                
+                kTrial = trialIdx(iiT);
+                
                 % index into X
                 frameIdx = frameCounter + (1:numel(h.trial(kTrial).frameTimes));
                 
@@ -253,13 +258,13 @@ classdef squareFlash < handle
                 % get upper left corner of the squares
                 xUL = squeeze(h.trial(kTrial).pos(1,:,:))';
                 yUL = squeeze(h.trial(kTrial).pos(2,:,:))';
-
+                
                 % lower right corner
                 xLR = squeeze(h.trial(kTrial).pos(3,:,:))';
                 yLR = squeeze(h.trial(kTrial).pos(4,:,:))';
                 
                 % eye position at frame flip (in pixels)
-                eyeX = h.trial(kTrial).eyePosAtFrame(:,1);                
+                eyeX = h.trial(kTrial).eyePosAtFrame(:,1);
                 eyeY = h.trial(kTrial).eyePosAtFrame(:,2);
                 
                 switch ip.Results.correctEyePos
@@ -297,9 +302,9 @@ classdef squareFlash < handle
                 
                 % flip y, because pixels count from top left to bottom
                 % right
-%                 yUL_ = -yUL_;
-%                 yLR_ = -yLR_;
-                               
+                %                 yUL_ = -yUL_;
+                %                 yLR_ = -yLR_;
+                
                 % loop over squares and recreate binned stimulus
                 for iSquare = 1:size(xUL_,2)
                     for iFrame = 1:size(xUL_,1)
@@ -308,38 +313,38 @@ classdef squareFlash < handle
                         Xtrial(iFrame,:) = Xtrial(iFrame,:) + tmp(:)';
                     end
                 end
+                %
+%                                 figure(1); clf
+%                                 subplot(1,2,1)
+%                                 imagesc(reshape(sum(Xtrial), sz))
+%                                 subplot(1,2,2)
+%                                 imagesc(Xtrial)
+%                                 drawnow
 %                 
-%                 figure(1); clf
-%                 subplot(1,2,1)
-%                 imagesc(reshape(sum(Xtrial), sz))
-%                 subplot(1,2,2)
-%                 imagesc(Xtrial)
-%                 drawnow
+                %                 % ignore values that are outside the window
+                %                 off = (x_ < winx(1) | x_ > winx(2)) | (y_ < winy(1) | y_ > winy(2));
+                %                 x_(off) = nan;
+                %                 y_(off) = nan;
+                %
+                %                 figure(1); clf
+                %                 xbin = binx(x_ - winx(1));
+                %                 ybin = biny(y_ - winy(1));
+                %
+                %                 for k = 1:size(xbin,2)
+                %                     stimOn = find(~(isnan(xbin(:,k)) | isnan(ybin(:,k))));
+                %
+                %                     xyind = sub2ind(sz, ybin(stimOn,k), xbin(stimOn,k));
+                %
+                %                     ind = sub2ind([nFrames, prod(sz)], stimOn, xyind);
+                %
+                %                     Xtrial(ind) = Xtrial(ind) + 1;
+                %
+                %                 end
                 
-%                 % ignore values that are outside the window
-%                 off = (x_ < winx(1) | x_ > winx(2)) | (y_ < winy(1) | y_ > winy(2));
-%                 x_(off) = nan;
-%                 y_(off) = nan;
-%                 
-%                 figure(1); clf
-%                 xbin = binx(x_ - winx(1));
-%                 ybin = biny(y_ - winy(1));
-%                 
-%                 for k = 1:size(xbin,2)
-%                     stimOn = find(~(isnan(xbin(:,k)) | isnan(ybin(:,k))));
-%                     
-%                     xyind = sub2ind(sz, ybin(stimOn,k), xbin(stimOn,k));
-%                     
-%                     ind = sub2ind([nFrames, prod(sz)], stimOn, xyind);
-%                     
-%                     Xtrial(ind) = Xtrial(ind) + 1;
-%                     
-%                 end
-
                 % if clipping out saccades
                 if isfield(h.trial, 'sac_start')
                     sac_buffer = ip.Results.saccadeBuffer;
-                    sacStartInds = bsxfun(@gt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_start(:)'-sac_buffer);
+                    sacStartInds = bsxfun(@gt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_start(:)');
                     sacStopInds  = bsxfun(@lt, h.trial(kTrial).frameTimes(:), h.trial(kTrial).sac_end(:)'+sac_buffer);
                     fixations = ~any(sacStartInds & sacStopInds, 2);
                     iix = fixations(:) & Vtrial(:);
@@ -359,8 +364,8 @@ classdef squareFlash < handle
             S.valid = valid;
             S.bins = flipTimes(:);
             S.size = sz;
-            S.xax  = (1:sz(2)) * binSize + winx(1);
-            S.yax  = (1:sz(1)) * binSize + winy(1);
+            S.xax  = xax + binSize/2; % recenter bins
+            S.yax  = yax + binSize/2; %(1:sz(1)) * binSize + winy(1);
             
         end
         
@@ -629,9 +634,9 @@ classdef squareFlash < handle
                 nktime = 20;
                 Xd = rfmap.makeStimRowsDense(xtime, nktime);
                 
-                cc.xx = Xd'*Xd;   % stimulus auto-covariance
-                cc.xy = (Xd'*y); % stimulus-response cross-covariance
-                cc.yy = y'*y;   % marginal response variance
+                cc.xx = Xd'*Xd;     % stimulus auto-covariance
+                cc.xy = (Xd'*y);    % stimulus-response cross-covariance
+                cc.yy = y'*y;       % marginal response variance
                 cc.nx = numel(cc.xy);     % number of dimensions in stimulus
                 cc.ny = numel(y);  % total number of samples
                 
@@ -884,6 +889,8 @@ classdef squareFlash < handle
                 return;
             end
             
+            pdsTrial = pds.getPdsTrialData(PDS);
+            
             for j = 1:numel(stimTrials)
                 thisTrial = stimTrials(j);
                 
@@ -893,7 +900,12 @@ classdef squareFlash < handle
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end)) - trial(kTrial).start;
                 
-                trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
+                if j==1
+                    trial = mergeStruct(trial(kTrial), pdsTrial(thisTrial).(stim));
+                else
+                    trial(kTrial) = mergeStruct(trial(kTrial), pdsTrial(thisTrial).(stim));
+                end
+                %                 trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
                 if size(trial(kTrial).pos, 3) ~= numel(trial(kTrial).frameTimes)
                     keyboard
                 end
@@ -902,7 +914,8 @@ classdef squareFlash < handle
                 nFrames = numel(trial(kTrial).frameTimes);
                 
                 % Eye position in pixels
-                trial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame(:,1:nFrames)';
+                trial(kTrial).eyePosAtFrame = pdsTrial(thisTrial).behavior.eyeAtFrame(:,1:nFrames)';
+%                 trial(kTrial).eyePosAtFrame = PDS.data{thisTrial}.behavior.eyeAtFrame(:,1:nFrames)';
                 
                 % Exclude edges of the screen
                 iix = trial(kTrial).eyePosAtFrame(:,1) < 200 | trial(kTrial).eyePosAtFrame(:,1) > 1800;
@@ -913,12 +926,12 @@ classdef squareFlash < handle
                 
                 % subtract the center of the screen
                 pospx = bsxfun(@minus, trial(kTrial).eyePosAtFrame, display.ctr(1:2));
-                    
+                
                 % flip y pos so up is positive
                 pospx(:,2) = -pospx(:,2);
-                    
+                
                 % convert to degrees
-                trial(kTrial).trial(kTrial).eyePosAtFrame = pds.px2deg(pospx', display.viewdist, display.px2w)';
+                trial(kTrial).eyePosAtFrame = pds.px2deg(pospx', display.viewdist, display.px2w)';
                 
             end
             
@@ -939,6 +952,8 @@ classdef squareFlash < handle
                 return;
             end
             
+            pdsTrial = pds.getPdsTrialData(PDS);
+            
             for j = 1:numel(stimTrials)
                 thisTrial = stimTrials(j);
                 
@@ -949,7 +964,12 @@ classdef squareFlash < handle
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
                 
                 % convert pos to degrees
-                trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
+                %                 trial(kTrial).pos        = PDS.data{thisTrial}.(stim).pos;
+                if j==1
+                    trial = mergeStruct(trial(kTrial), pdsTrial(kTrial).(stim));
+                else
+                    trial(kTrial) = mergeStruct(trial(kTrial), pdsTrial(thisTrial).(stim));
+                end
                 
                 eyepos = io.getEyePosition(PDS, thisTrial);
                 trial(kTrial).eyeSampleTime = eyepos(:,1);

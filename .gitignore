@@ -5,3 +5,5 @@ potentiallyuseful/
 *.tif
 figures/
 *.pdf
+*.avi
+utils/bad/
