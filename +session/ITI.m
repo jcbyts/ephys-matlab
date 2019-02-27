@@ -38,7 +38,8 @@ classdef ITI < handle
             h.trial = [];
             for i = 1:h.numTrials
                 h.trial(i).start = tends(i);
-                h.trial(i).end   = tstarts(i+1);
+                h.trial(i).stop   = tstarts(i+1);
+                h.trial(i).duration = h.trial(i).stop - h.trial(i).start;
             end
             % assuming the display parameters didn't change during the
             % session, store them in the object

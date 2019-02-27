@@ -898,6 +898,7 @@ classdef squareFlash < handle
                 
                 trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end)); %#ok<*AGROW>
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).stop      = trial(kTrial).frameTimes(end);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end)) - trial(kTrial).start;
                 
                 if j==1
@@ -961,6 +962,7 @@ classdef squareFlash < handle
                 
                 trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1)); %#ok<*AGROW>
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).stop      = trial(kTrial).frameTimes(end);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
                 
                 % convert pos to degrees

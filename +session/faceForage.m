@@ -169,7 +169,7 @@ classdef faceForage < handle
             stim = 'faceforage';
             
             trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
-            
+            trialIx = trialIx | cellfun(@(x) isfield(x, 'forage'), PDS.data);
             stimTrials = find(trialIx);
             
             % --- check for conditions
@@ -207,9 +207,16 @@ classdef faceForage < handle
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end)) - trial(kTrial).start;
                 
                 nFrames = numel(trial(kTrial).frameTimes);
-                trial(kTrial).xpos = PDS.data{thisTrial}.(stim).x(1:nFrames,:);
-                trial(kTrial).ypos = PDS.data{thisTrial}.(stim).y(1:nFrames,:);
-                trial(kTrial).hold = PDS.data{thisTrial}.(stim).ctrHold(1:nFrames,:);
+                try
+                    trial(kTrial).xpos = PDS.data{thisTrial}.(stim).x(1:nFrames,:);
+                    trial(kTrial).ypos = PDS.data{thisTrial}.(stim).y(1:nFrames,:);
+                    trial(kTrial).hold = PDS.data{thisTrial}.(stim).ctrHold(1:nFrames,:);
+                catch
+                    stim = 'forage';
+                    trial(kTrial).xpos = PDS.data{thisTrial}.(stim).x(1:nFrames,:);
+                    trial(kTrial).ypos = PDS.data{thisTrial}.(stim).y(1:nFrames,:);
+                    trial(kTrial).hold = PDS.data{thisTrial}.(stim).ctrHold(1:nFrames,:);
+                end
 % %                 eyepos = io.getEyePosition(PDS, thisTrial);
 % %                 
 % %                 trial(kTrial).eyeSampleTime = eyepos(:,1);

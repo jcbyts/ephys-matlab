@@ -95,6 +95,7 @@ classdef csdFlash < handle
                 
                 csdTrial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1));
                 csdTrial(kTrial).start      = csdTrial(kTrial).frameTimes(1);
+                csdTrial(kTrial).stop       = csdTrial(kTrial).frameTimes(end);
                 csdTrial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - csdTrial(kTrial).start;
                 
                 if isempty(PDS.data{thisTrial}.(stim).hFlash.log)

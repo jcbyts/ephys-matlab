@@ -98,6 +98,7 @@ classdef natImgBackground < handle
                 
                 trial(kTrial).frameTimes = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,1:end-1));
                 trial(kTrial).start      = trial(kTrial).frameTimes(1);
+                trial(kTrial).stop       = trial(kTrial).frameTimes(end);
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
                 trial(kTrial).imgIdx     = PDS.data{thisTrial}.(stim).imgIndex(PDS.data{thisTrial}.(stim).texShown(1:end-1));
                 

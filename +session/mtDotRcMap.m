@@ -56,6 +56,7 @@ classdef mtDotRcMap < handle
                         % --- Timing
                         mtmapTrial(kTrial).frameTimes = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,1:end-1));
                         mtmapTrial(kTrial).start      = mtmapTrial(kTrial).frameTimes(1);
+                        mtmapTrial(kTrial).stop       = mtmapTrial(kTrial).frameTimes(end);
                         mtmapTrial(kTrial).duration   = PDS{i}.PTB2OE(PDS{i}.data{thisTrial}.timing.flipTimes(1,end-1)) - mtmapTrial(kTrial).start;
                         
                         % --- Eye position
