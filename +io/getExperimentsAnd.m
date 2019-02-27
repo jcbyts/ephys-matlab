@@ -27,7 +27,13 @@ for iArg = 1:nArgs
     arg = varargin{k};
     val = varargin{k+1};
     
+    
+    
     dat = meta.(arg);
+    
+    if strcmp(arg, 'Date')
+       dat = cellfun(@(x) datenum(x, 'mm/dd/yyyy'), dat);
+    end
     
     switch class(val)
         
@@ -41,6 +47,10 @@ for iArg = 1:nArgs
         case 'double'
             
             idx(:,iArg) = dat == val;
+            
+        case 'cell'
+            
+            idx(:,iArg) = dat >= val{1} & dat <= val{2};
             
             
     end

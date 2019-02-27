@@ -41,9 +41,11 @@ elInfo.sampleRate = [];
 elInfo.dateNum    = [];
 elInfo.fields     = {'EyeX', 'EyeY', 'PupilArea'};
 elInfo.bitDeg     = 1e-3;
-if ~isfolder(fullfile(sess.path, '_behavior'))
-    mkdir(fullfile(sess.path, '_behavior'))
-end
+% if datenum(version('-date')) < datenum('20180101', 'yyyymmdd')
+%     if 
+% if ~isfolder(fullfile(sess.path, '_behavior'))
+mkdir(fullfile(sess.path, '_behavior'))
+% end
 feye    = fullfile(sess.path, '_behavior', 'eyepos.dat');
 felinfo = fullfile(sess.path, '_behavior', 'eye_info.mat');
 
@@ -105,6 +107,7 @@ for kPds = 1:nPds
 %         [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
         edfFile = PDS{kPds}.initialParametersMerged.eyelink.edfFile;
         fprintf('Reading [%s] \n', edfFile)
+        if exist(fullfile(sess.path, edfFile), 'file')
         [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds}, edfFile);
         fwrite(fidout, dataRAW', '*uint16');
         
@@ -113,7 +116,10 @@ for kPds = 1:nPds
         elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
         elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
         elInfo.bitDeg       = el_info.bitDeg;
-        catch
+        else
+            warning('no edf data for PDS %d [%s]', kPds, edfFile)
+        end
+        catch me
             warning(me.identifier, me.message)
             warning('no edf data for PDS %d [%s]', kPds, edfFile)
         end
@@ -193,11 +199,27 @@ ElTimeCmChanged = [0 cellfun(@(x) x.timing.eyelinkStartTime(2), PDS.data(calibMa
 eyeIdx = PDS.initialParametersMerged.eyelink.eyeIdx;
 
 
-
+% --- This is the actual eyelink import
+% look for an edf file that matches the reported edf name
+% if it exists, look to see if a .mat file already exists. If the mat file
+% does not exist, copy the edf file over 
 elFile=fullfile(sess.path, [edfFile '.edf']);
 hasEdf=exist(elFile, 'file');
+elMatFile = fullfile(sess.path, [edfFile '.mat']);
+hasMatEdf=exist(elMatFile, 'file');
 if hasEdf
-    el=edfmex(elFile);
+    if hasMatEdf
+        el = load(elMatFile);
+    else
+        edftmpdir = 'C:\Data\edftmp';
+        mkdir(edftmpdir);
+        edfTmpFile = fullfile(edftmpdir, [edfFile '.edf']);
+        copyfile(elFile, edfTmpFile);
+        el=edfmex(edfTmpFile);
+        edfTmpMatFile = fullfile(edftmpdir, [edfFile '.mat']);
+        save(edfTmpMatFile, '-struct', 'el');
+        copyfile(edfTmpMatFile, elMatFile);
+    end
     elTrialStarts=arrayfun(@(x) strcmp(x.message, 'TRIALSTART'), el.FEVENT);
     elTrialTS=double(arrayfun(@(x) x.sttime, el.FEVENT(elTrialStarts)));
 end

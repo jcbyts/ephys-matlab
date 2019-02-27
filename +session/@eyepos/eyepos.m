@@ -55,10 +55,10 @@ classdef eyepos
             value = 1./d.dt;
         end
         
-        function value = get.dt(d)
-            % sampling interval (s/sample)
-            value = median(diff(d.t));
-        end
+%         function value = get.dt(d)
+%             % sampling interval (s/sample)
+%             value = median(diff(d.t));
+%         end
         
         function value = get.parea(d)
             % pupil area (a.u.)
@@ -93,6 +93,8 @@ classdef eyepos
                 otherwise
                     error('Invailid arguments in call to marmodata.eyedata().');
             end
+            
+            d.dt = mode(diff(d.tsample));
         end
         
         function value = t2s(d,t)
