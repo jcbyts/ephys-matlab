@@ -1,28 +1,38 @@
-function sp = getSpikesFromKilo(ops, info)
+function sp = getSpikesFromKilo(ops, info, varargin)
 % getSpikesFromKilo gets the spike sorting output from Kilosort
 % requires the spikeTools from cortexlab github
 
+ip = inputParser();
+ip.addParameter('clipWaveforms', false);
+ip.parse(varargin{:});
+
+clipWaveforms = ip.Results.clipWaveforms;
 if isa(ops, 'table')
-    assert(any(strcmp(ops.SpikeSorting, 'Kilo')), 'Kilosort has not been run on this session')
+%     if ~any(strfind(ops.SpikeSorting, 'Kilo'))
+%         warning('Kilosort has not been run on this ops')
+%         sp = [];
+%         return
+%     end
+    
     ops = io.loadOps(ops);
     sp = [];
     for i = 1:numel(ops)
         try
-            sp = [sp get_spikes_kilo_helper(ops(i))];
+            sp = [sp get_spikes_kilo_helper(ops(i), [], clipWaveforms)];
         end
     end
     
 else
-    if ~exist('info', 'var')
+    if ~exist('info', 'var') || isempty(info)
         info = load(fullfile(ops.root, 'ephys_info.mat'));
     end
-    sp = get_spikes_kilo_helper(ops, info);
+    sp = get_spikes_kilo_helper(ops, info, clipWaveforms);
 end
 
 
-function sp = get_spikes_kilo_helper(ops, info)
+function sp = get_spikes_kilo_helper(ops, info, clipWaveforms)
 
-if nargin < 2
+if nargin < 2 || isempty(info)
     info = load(fullfile(ops.root, 'ephys_info.mat'));
 end
 
@@ -193,11 +203,14 @@ sp(f).uQ = uQ;
 sp(f).cR = cR;
 sp(f).isiV = isiV;
 
-fprintf('Clipping waveforms from raw\n')
-raw = io.loadRaw(ops, [], true, true)';
-raw = bsxfun(@minus, raw, mean(raw));
-
-[~, ~, sp(f).wftax, sp(f).wfs] = pdsa.eventTriggeredAverage(raw, double(sp(f).ss), [-10 32]);
+% this should be optionsl
+if clipWaveforms
+    fprintf('Clipping waveforms from raw\n')
+    raw = io.loadRaw(ops, [], true, true)';
+    raw = bsxfun(@minus, raw, mean(raw));
+    
+    [~, ~, sp(f).wftax, sp(f).wfs] = pdsa.eventTriggeredAverage(raw, double(sp(f).ss), [-10 32]);
+end
 
 end
 
