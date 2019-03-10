@@ -29,7 +29,7 @@ classdef eyepos
         
         pwdth@double; % pupil width
         phght@double; % pupil height
-        
+        dt; % sampling interval (s/sample), dt = 1/fs
         toffset@double = 0; % time of first sample
     end
     
@@ -38,7 +38,6 @@ classdef eyepos
         t; % time
         
         fs; % sampling freq. (samples/s; Hz), fs = 1/dt
-        dt; % sampling interval (s/sample), dt = 1/fs
         parea; % pupil area
     end
     

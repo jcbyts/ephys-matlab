@@ -28,6 +28,11 @@ end
 
 % electrode options are specified here. Follow the existing examples to
 % create new ones.
+if isempty(name)
+    shank = [];
+    return
+end
+
 switch name
     case 'Shank2'
         

@@ -110,8 +110,16 @@ if forceAll
     trial = pds.getPdsTrialData(PDS);
     % --- Synchronize the clocks ------------------------------------------
     fprintf('Forcing all PDS files to be synced together\n')
-    [OE2PTBfit, ~,PTB2OE, maxreconstructionerror] = io.sync2OeClock_trial(trial, evList);
-    fprintf('Strobe times aligned. Max reconstruction error is %2.3f ms\n', maxreconstructionerror*1e3)
+    
+    if isempty(evList)
+        fprintf('no ephys this session\n')
+        OE2PTBfit = @(x) x;
+        PTB2OE = @(x) x;
+        maxreconstructionerror = inf;
+    else
+        [OE2PTBfit, ~,PTB2OE, maxreconstructionerror] = io.sync2OeClock_trial(trial, evList);
+        fprintf('Strobe times aligned. Max reconstruction error is %2.3f ms\n', maxreconstructionerror*1e3)
+    end
     
     for kPdsFile = 1:numel(PDS)
         PDS{kPdsFile}.OE2PTBfit = OE2PTBfit;

@@ -129,6 +129,8 @@ end
 
 elInfo.sampleRate = unique(elInfo.sampleRate);
 if numel(elInfo.sampleRate)~=1
+    fclose(fidout);
+    delete(feye)
     keyboard
 end
 assert(numel(elInfo.sampleRate)==1, 'Eyelink sample rate changed throughout session. This is not supported')

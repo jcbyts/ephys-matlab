@@ -118,10 +118,14 @@ end
 disp('Converting the Open Ephys files to a single binary file.')
 io.oe2dat(oepath, shank, 'overwrite', ip.Results.overwrite, 'verbose', true);
 
-thisSession.oe2dat = true;
 
 % --- load session: This is central to all operations
 sess = io.loadSession(oepath);
+if sess.nShanks == 0
+    thisSession.oe2dat = false;
+else
+    thisSession.oe2dat = true;
+end
 
 % important!! make sure you are on the right version of the stimulus code
 overwrite = ip.Results.overwrite; % if it breaks, run again with true
