@@ -1,19 +1,37 @@
-function data = ddpi(fname)
+function data = ddpi(fname, overwrite, debug, eyelinkIllumination)
 %set(0,'DefaultFigureWindowStyle','docked')
 % close all;
 % clear all;
 
+if nargin < 4
+    eyelinkIllumination = false; % default assumption is no eyelink illumination
+end
+
+if nargin < 3 || isempty(debug)
+    debug = false;
+end
+
+if nargin < 2 || isempty(overwrite)
+    overwrite = false;
+end
+
+
+global DEBUG;
 global P1_ROI_SIZE;
 global P4_ROI_SIZE;
 global THRESHOLD;
+global PUPILTHRESH;
 global IMG_WIDTH;
 global IMG_HEIGHT;
+global EYELINK;
 
-P1_ROI_SIZE = 128;
-P4_ROI_SIZE = 32;
-THRESHOLD = 128;
-IMG_WIDTH = 2040;
-IMG_HEIGHT = 1088;
+EYELINK = eyelinkIllumination;
+DEBUG = debug;
+P1_ROI_SIZE = 30;
+P4_ROI_SIZE = 20;
+THRESHOLD = 75;
+PUPILTHRESH = 2;
+
 
 if nargin < 1
     fname = 'test.avi';
@@ -23,7 +41,7 @@ fprintf('Opening [%s]\n', fname)
 
 [~, fn, ~] = fileparts(fname);
 outfname = [fn 'tracersm.mat'];
-if exist(outfname, 'file')
+if exist(outfname, 'file') && ~overwrite
     tmp = load(outfname);
     data = tmp.data;
     return
@@ -31,9 +49,12 @@ end
 
 v = VideoReader(fname);
 
+IMG_WIDTH = v.Width;
+IMG_HEIGHT = v.Height;
+
 tic
 fprintf('Running tracking analysis...')
-[p1x, p1y, p1offx, p1offy, p4x, p4y, p4offx, p4offy] = track(v);
+[p1x, p1y, p1offx, p1offy, p4x, p4y, p4offx, p4offy, pupx, pupy, time] = track(v);
 
 fprintf('[%02.2fs]\n', toc)
 
@@ -41,15 +62,24 @@ data.x1 = p1x + p1offx;
 data.x4 = p4x + p4offx;
 data.y1 = p1y + p1offy;
 data.y4 = p4y + p4offy;
+data.xp = pupx;
+data.yp = pupy;
+data.time = time;
+
 
 
 save(outfname, 'data');
 end
 
-function [p1x, p1y, p1offx, p1offy, p4x, p4y, p4offx, p4offy] = track(video)
+function [p1x, p1y, p1offx, p1offy, p4x, p4y, p4offx, p4offy, pupx, pupy, time] = track(video)
 global P1_ROI_SIZE;
 global P4_ROI_SIZE;
 global THRESHOLD;
+global PUPILTHRESH;
+global DEBUG;
+global IMG_HEIGHT;
+global IMG_WIDTH;
+global EYELINK;
 
 p1x = [];
 p1y = [];
@@ -61,30 +91,222 @@ p4y = [];
 p4offx = [];
 p4offy = [];
 
+pupx = [];
+pupy = [];
+
+time = [];
+
 frame = 1;
-while hasFrame(video)
+while 1
+    if DEBUG
+        disp([video.CurrentTime video.Duration])
+    end
+    
+    if ~hasFrame(video)
+        break
+    end
+    
+    % store video file time
+    time(frame) = video.CurrentTime;
+    
+    % read frame -> store on GPU
     img = readFrame(video);
     img = gpuArray(img(:, :, 1));
     
+    % --- detect pupil ROI
+    
+    % threshold and smooth
+    fimg = imgaussfilt(double(img<PUPILTHRESH), 2);
+    
+    % find pupil ROI
+    pimg = bwlabel(fimg > 0, 8);
+    pimg(pimg==mode(pimg(:,1))) = 0; % remove any big edge artifacts
+    pimg(pimg==mode(pimg(:,end))) = 0; % remove any big edge artifacts
+    pid = mode(pimg(pimg~=0));
+    pimg = pimg==pid;
+    xy = contour(pimg, [1 1]); % get contour around pupil
+    label = bwlabel(xy(1,:)>1);
+    pcontour = (xy(:,label==1));
+    
+    x = sum(pimg)>0;
+    y = sum(pimg,2)>0;
+    ixPupil = double(y(:))*double(x(:))';   
+    [ii,jj] = find(ixPupil);
+    ii = unique(ii);
+    jj = unique(jj);
+    
+    if isempty(ii) % no pupil
+        p1x(frame) = -1;
+        p4x(frame) = -1;
+        p1y(frame) = -1;
+        p4y(frame) = -1;
+        p1offx(frame) = -1;
+        p1offy(frame) = -1;
+        p4offx(frame) = -1;
+        p4offy(frame) = -1;
+        pupx(frame) = -1;
+        pupy(frame) = -1;
+        continue
+    end
+    
+    % analysis restricted to pupil ROI
+    img = img(ii,jj); % only analyze blobs in pupil
+    
+    % contour of the pupil outline
+    pcontour(1,:) = pcontour(1,:) - gather(jj(1));
+    pcontour(2,:) = pcontour(2,:) - gather(ii(1));
+    
+    % new image size
+    [IMG_HEIGHT, IMG_WIDTH] = size(img);
+    
+    
+    % --- high threshold to find putative purkinje images
     fimg = imgaussfilt(double(img), 1);
     [limg, nLabels] = bwlabel(fimg > THRESHOLD, 8);
     
-    if (nLabels == 2)
-        Bbox = findBlob(limg, nLabels);
+    if (nLabels >= 2) % need at least two images for this to work
         
-        [sx, ex, sy, ey] = ROI(Bbox(1, :), P1_ROI_SIZE);
+        try % incase of badness put analyses in a try-catch statement
+            
+            % --- find all blobs in ROI
+            [Bbox, Areas] = findBlob(limg, nLabels);
+            
+            if DEBUG % plot blobs
+                figure(1); clf
+                subplot(3,1,1:2)
+                imagesc(img); hold on
+                for ii = 1:size(Bbox,1)
+                    plot(Bbox(ii,[1 1 3 3 1]), Bbox(ii,[2 4 4 2 2]), 'y')
+                end
+                title('Detected Blobs')
+                drawnow
+            end
+        
+            % Edge Cases 1: weird aspect ratios
+            
+            % flag blobs with really weird aspect ratios (easy to remove)
+            boxWidth = (Bbox(:,3)-Bbox(:,1));
+            boxHeight = (Bbox(:,4)-Bbox(:,2));
+            aspect = boxWidth ./ boxHeight;
+            weirdshape = abs(aspect - 1) >= .5 & Areas > 10;
+        
+            boxCtr = [Bbox(:,1) + boxWidth/2, Bbox(:,2) + boxHeight/2];
+        
+            if DEBUG % plot removed blobs
+                for ii = find(weirdshape)'
+                    plot(Bbox(ii,[1 1 3 3 1]), Bbox(ii,[2 4 4 2 2]), 'b')
+                end
+                drawnow
+            end
+            
+            Bbox(weirdshape,:) = [];
+            Areas(weirdshape,:) = [];
+            boxCtr(weirdshape,:) = [];
+        
+            % --- fit ellipse to the pupil 
+            fit = fit_ellipse(pcontour(1,:)', pcontour(2,:)');
+            
+            % get polygon for pupil
+            phi = fit.phi;
+            cosphi = cos(phi);
+            sinphi = sin(phi);
+            R = [cosphi sinphi; -sinphi cosphi];
+            thetas = linspace(0, 2*pi, 100);
+            ex = fit.X0 + fit.a * cos(thetas);
+            ey = fit.Y0 + fit.b * sin(thetas);
+            epoly = R * [ex; ey];
+                
+            % store pupil center
+            pupx(frame) = fit.X0_in;
+            pupy(frame) = fit.Y0_in;
+        
+            % only analyze blobs within the pupil ellipse
+            in = find(inpolygon(boxCtr(:,1), boxCtr(:,2),epoly(1,:), epoly(2,:)));
+        if DEBUG
+            plot(epoly(1,:), epoly(2,:), 'r')
+            plot(boxCtr(:,1), boxCtr(:,2), 'c.')
+            for ii = in(:)'
+                plot(Bbox(ii,[1 1 3 3 1]), Bbox(ii,[2 4 4 2 2]), 'm')
+            end
+        end
+        
+        if numel(in) < 2
+            error
+        end
+        
+        % P1 is the biggest blob in the pupil (findBlob is sorted by area)
+        p1ix = in(1);
+        
+        % p4 is the smallest blob in the pupil
+        p4ix = in(end);
+        
+        % Edge cases
+        if EYELINK
+            if numel(in) > 2 % more than two blobs in pupil
+                bigblobs = Areas(in) > 100;
+                bigblobs = in(bigblobs);
+                if numel(bigblobs) > 1 % more than one big blob
+                    [~, ix] = max(Bbox(bigblobs,1)); % find the bib blob that is furthest to the right
+                    p1ix = bigblobs(ix);
+                end
+            end
+        end
+        
+        [sx, ex, sy, ey] = ROI(Bbox(p1ix, :), P1_ROI_SIZE);
+        
         p1Img = fimg(sy:ey, sx:ex);
         [p1x(frame), p1y(frame)] = radialcenter(p1Img);
 %         [p1x(frame), p1y(frame)] = centerOfMass(p1Img, 200);
         p1offx(frame) = sx;
         p1offy(frame) = sy;
         
-        [sx, ex, sy, ey] = ROI(Bbox(2, :), P4_ROI_SIZE);
+        
+        if sum(Areas(in) < 60) > 1
+            [~, p4ix] = max(Bbox(in,1),[],1);
+            p4ix = in(p4ix);
+        end
+     
+        [sx, ex, sy, ey] = ROI(Bbox(p4ix, :), P4_ROI_SIZE);
         p4Img = fimg(sy:ey, sx:ex);
         [p4x(frame), p4y(frame)] = radialcenter(p4Img);
 %         [p4x(frame), p4y(frame)] = centerOfMassWithResample(p4Img, 125, 10);
         p4offx(frame) = sx;
         p4offy(frame) = sy;
+         
+        
+        if DEBUG
+           
+            subplot(3,1,1:2)
+            plot(epoly(1,:), epoly(2,:), 'r')
+            plot(Bbox(p1ix,[1 1 3 3 1]), Bbox(p1ix,[2 4 4 2 2]), 'r')
+            plot(Bbox(p4ix,[1 1 3 3 1]), Bbox(p4ix,[2 4 4 2 2]), 'g')
+            
+            plot(p1x(frame)+p1offx(frame)-1, p1y(frame)+p1offy(frame)-1, '+r', 'MarkerSize', 10);
+            plot(p4x(frame)+p4offx(frame)-1, p4y(frame)+p4offy(frame)-1, '+g', 'MarkerSize', 10);
+            plot(pupx(frame),pupy(frame), 'm+')
+            title(frame)
+            subplot(3,2,5)
+            imagesc(p1Img); hold on
+            plot(p1x(frame), p1y(frame), '+r', 'MarkerSize', 10)
+            subplot(3,2,6)
+            imagesc(p4Img); hold on
+            plot(p4x(frame), p4y(frame), '+g', 'MarkerSize', 10)
+            drawnow
+        end
+        
+        catch
+        
+        p1x(frame) = -1;
+        p4x(frame) = -1;
+        p1y(frame) = -1;
+        p4y(frame) = -1;
+        p1offx(frame) = -1;
+        p1offy(frame) = -1;
+        p4offx(frame) = -1;
+        p4offy(frame) = -1;
+        pupx(frame) = -1;
+        pupy(frame) = -1;
+        end
         
     else
         p1x(frame) = -1;
@@ -95,6 +317,8 @@ while hasFrame(video)
         p1offy(frame) = -1;
         p4offx(frame) = -1;
         p4offy(frame) = -1;
+        pupx(frame) = -1;
+        pupy(frame) = -1;
     end
     frame = frame + 1;
 end
@@ -146,7 +370,7 @@ cx = sum(sx(:)) / s  / RESAMPLE;
 cy = sum(sy(:)) / s / RESAMPLE;
 end
 
-function Bbox = findBlob(limg, nLabels)
+function [Bbox, Areas] = findBlob(limg, nLabels)
 global IMG_HEIGHT;
 Bbox = zeros(nLabels, 4);
 Areas = zeros(nLabels, 1);
@@ -160,7 +384,7 @@ for i=1:nLabels
     height = Bbox(i, 4) - Bbox(i, 2);
     Areas(i) = width * height;
 end
-[~, I] = sort(Areas, 'descend');
+[Areas, I] = sort(Areas, 'descend');
 Bbox = Bbox(I, :);
 end
 

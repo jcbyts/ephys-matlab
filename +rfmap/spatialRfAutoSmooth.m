@@ -1,4 +1,4 @@
-function [B,dc,params] = spatialRfAutoSmooth(X, y, lags, dims, varargin)
+function [w,dc,params] = spatialRfAutoSmooth(X, y, lags, dims, varargin)
 % Fit spatial receptive field with smoothness penalty
 % 
 % Inputs:
@@ -162,7 +162,7 @@ for i = 1:nneuron
 end
 
 if any(constCols)
-    w = nan(numel(constCols)+ip.Results.addDC, nneuron);
+    w = nan(npred+ip.Results.addDC, nneuron);
     se2 = nan(size(se));
     ix = [~constCols(:); ip.Results.addDC];
     for i = 1:nneuron

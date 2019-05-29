@@ -102,6 +102,12 @@ classdef natImgBackground < handle
                 trial(kTrial).duration   = PDS.PTB2OE(PDS.data{thisTrial}.timing.flipTimes(1,end-1)) - trial(kTrial).start;
                 trial(kTrial).imgIdx     = PDS.data{thisTrial}.(stim).imgIndex(PDS.data{thisTrial}.(stim).texShown(1:end-1));
                 
+                fl = pdstrial(thisTrial).(stim).fileList;
+                trial(kTrial).fileList = fl(unique(trial(kTrial).imgIdx));
+                for k = 1:numel(trial(kTrial).fileList)
+                    trial(kTrial).fileList(k).folder = pdstrial(thisTrial).(stim).imgDir;
+                end
+                    
             end
             
             % TODO: actually link to images

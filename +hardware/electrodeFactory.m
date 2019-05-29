@@ -18,6 +18,7 @@ if nargin == 0
         'V1singleCh25', ...
         'ShankA', ...
         'ShankB', ...
+        'TungNarishige', ...
         };
     
     name = io.selectFromList(shankList);
@@ -113,6 +114,12 @@ switch name
         chanMap = 25;
         shank{1} = hardware.electrode.customChannelMap(chanMap);
         shank{1}.name = 'TungstenCapDrive';
+    case 'TungNarishige'
+        
+        chanMap = [3 5];
+        shank{1} = hardware.electrode.customChannelMap(chanMap);
+        shank{1}.name = 'TungstenNarashige';
+        
     case 'ShankA'
         shank{1} = hardware.electrode.AtlasE32R35S1L8NT;
         shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;

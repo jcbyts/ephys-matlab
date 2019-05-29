@@ -24,5 +24,10 @@ for i = 1:nDirs
     fspike = fullfile(sess.path, ephys_dirs(i).name, sprintf('sp-%s.mat', tag));
     if exist(fspike, 'file')
         sp{i} = load(fspike);
+        
+        if strcmp(tag, 'threshold')
+            sp{i}.uQ = zeros(size(sp{i}.isiV));
+            sp{i}.name = 'tungsten';
+        end
     end
 end

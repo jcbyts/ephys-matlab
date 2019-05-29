@@ -61,10 +61,19 @@ NEW_FS = 1e3;
 OE_HIGHPASS = 0.1;
 CHUNK_SIZE = 1000; % seconds
 
+useGpu = false;
+% try
+%     if gpuDeviceCount > 0
+%         useGpu = true;
+%     end
+% end
+
 % --- begin analysis
 
 % build low-pass filter
-[b, a] = butter(1, LOW_CUTOFF/info.sampleRate*2, 'low');
+% [b, a] = butter(1, LOW_CUTOFF/info.sampleRate*2, 'low'); don't use
+% butterworh
+loratio = LOW_CUTOFF/info.sampleRate*2;
 
 % --- load raw data
 tic
@@ -139,6 +148,10 @@ dataRAW = fread(fid, bufferSize, '*int16');
 % --- convert from integer to double
 dataRAW = double(dataRAW');
 
+if useGpu
+    dataRAW = gpuArray(dataRAW);
+end
+
 if block == nBlocks
     Nsample = 2^nextpow2(min(size(dataRAW,1), info.sampleRate*CHUNK_SIZE)); % ~500s chunks
     
@@ -160,11 +173,17 @@ end
 
 % --- low-pass filter with 0 group delay (filter both ways)  
 % This is faster than filtfilt
-dataRAW = filter(b,a,dataRAW);
-dataRAW = flipud(dataRAW);
-dataRAW = filter(b,a,dataRAW);
-dataRAW = flipud(dataRAW);
 
+dataRAW = iosr.dsp.sincFilter(dataRAW, loratio);
+% dataRAW = filter(b,a,dataRAW);
+% dataRAW = flipud(dataRAW);
+% dataRAW = filter(b,a,dataRAW);
+% dataRAW = flipud(dataRAW);
+
+if useGpu
+    dataRAW = gather(dataRAW);
+end
+    
 % --- convert to volts
 dataRAW = dataRAW*info.bitVolts;
 
@@ -206,9 +225,17 @@ for ch = 1:Nchan
         figure(f(1)); clf
     end
     
+    if useGpu
+        xdata = gpuArray(data(iigood,ch));
+    else
+        xdata = data(iigood,ch);
+    end
     
-    newdata = preprocess.removeLineNoiseChunkwise(data(iigood,ch), NEW_FS, LINE_NOISE_FREQ, 2,lineNoiseChunk , plotIt);
+    newdata = preprocess.removeLineNoiseChunkwise(xdata, NEW_FS, LINE_NOISE_FREQ, 2,lineNoiseChunk , plotIt);
     
+    if useGpu
+        newdata = gather(newdata);
+    end
     
     if plotIt
         figure(f(2)); clf

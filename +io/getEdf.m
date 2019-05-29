@@ -48,6 +48,7 @@ mkdir(fullfile(sess.path, '_behavior'))
 % end
 feye    = fullfile(sess.path, '_behavior', 'eyepos.dat');
 felinfo = fullfile(sess.path, '_behavior', 'eye_info.mat');
+feltime = fullfile(sess.path, '_behavior', 'eye_time.mat');
 
 if exist(feye, 'file') && ~overwrite
     elInfo = load(felinfo);
@@ -65,7 +66,14 @@ if exist(feye, 'file') && ~overwrite
     data(1,data(3,:)==0) = nan;
     data(2,data(3,:)==0) = nan;
     
-    timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+    if exist(feltime, 'file')
+        load(feltime, 'timestamps');
+        if numel(timestamps) ~= size(data,2) %#ok<NODEF>
+            timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+        end
+    else
+        timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+    end
     
     if flipX
         data(1,:) = -data(1,:);
@@ -93,7 +101,7 @@ for kPds = 1:nPds
     try
     [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
     fprintf('Reading [%s] \n', edfFile)
-    [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds});
+    [dataRAW, timestamps, el_info] = getEdfData(sess, PDS{kPds});
     fwrite(fidout, dataRAW', '*uint16')
     
     elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
@@ -137,6 +145,7 @@ assert(numel(elInfo.sampleRate)==1, 'Eyelink sample rate changed throughout sess
 
 fclose(fidout);
 save(felinfo, '-v7.3', '-struct', 'elInfo');
+save(feltime, '-v7', 'timestamps')
 
 fid = fopen(feye, 'r');
 fseek(fid, 0, 'eof');
@@ -151,7 +160,11 @@ data(1:2,:) = data(1:2,:)*elInfo.bitDeg(1) + elInfo.bitDeg(2);
 data(1,data(3,:)==0) = nan;
 data(2,data(3,:)==0) = nan;
 
-timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+if exist(feltime, 'file')
+    load(feltime);
+else
+    timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+end
 
 if flipX
     data(1,:) = -data(1,:);

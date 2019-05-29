@@ -18,6 +18,10 @@ classdef csdFlash < handle
             % --- find CSD flash trials
             stim = 'csdFlash';
             
+            if nargin < 1
+                return
+            end
+            
             [hasStim, numTrialsPerPDS] = io.findPDScontainingStimModule(PDS, stim);
             trialOffset = [0; cumsum(numTrialsPerPDS)];
             
@@ -233,12 +237,12 @@ classdef csdFlash < handle
                 hold on
                 plot(time, bsxfun(@plus, sta, ch0), 'Color', repmat(.1, 1, 3))
                 xlim(ip.Results.window)
-                plot(time([1 end]), stats.sinkDepth*[1 1], 'w--', 'Linewidth', 2)
-                plot(time([1 end]), [1; 1]*stats.reversalPointDepth, 'r--', 'Linewidth', 2)
-                tmp = abs(stats.reversalPointDepth - stats.sinkDepth);
-                tmp = tmp + stats.sinkDepth;
-                plot(time([1 end]), [1; 1]*tmp, 'r--', 'Linewidth', 2)
-                axis ij
+%                 plot(time([1 end]), stats.sinkDepth*[1 1], 'w--', 'Linewidth', 2)
+%                 plot(time([1 end]), [1; 1]*stats.reversalPointDepth, 'r--', 'Linewidth', 2)
+%                 tmp = abs(stats.reversalPointDepth - stats.sinkDepth);
+%                 tmp = tmp + stats.sinkDepth;
+%                 plot(time([1 end]), [1; 1]*tmp, 'r--', 'Linewidth', 2)
+%                 axis ij
             end
         end
 

@@ -142,14 +142,17 @@ end
 % Loop over sessions and import the local field potential
 % This is really slow because of the line-noise fitting and correction
 ops = io.loadOps(oepath);
+thisSession.LfpPhaseCorrection = false;
 
-plotIt = false;
-for i = 1:numel(ops)
-    [~, ~, info] = io.getLFP(ops(i),overwrite,plotIt);
-end
-
-if info.phaseCorrection
-    thisSession.LfpPhaseCorrection = true;
+if numel(ops) > 0
+    plotIt = false;
+    for i = 1:numel(ops)
+        [~, ~, info] = io.getLFP(ops(i),overwrite,plotIt);
+    end
+    
+    if info.phaseCorrection
+        thisSession.LfpPhaseCorrection = true;
+    end
 end
 
 io.writeMeta(thisSession, 2) % 2 means overwrite everything without prompt
