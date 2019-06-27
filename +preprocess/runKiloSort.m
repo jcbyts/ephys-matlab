@@ -124,7 +124,7 @@ ip.addOptional('overwrite', false)
 ip.parse(varargin{:});
 
 % check if Kilosort has already been run
-if exist(fullfile(ops.root,  'rez.mat'), 'file')
+if exist(fullfile(ops.root,  'rez.mat'), 'file') && ~ip.Results.overwrite
     fprintf('Kilosort has already been run. Skipping\n')
     success = true;
     phypath = [];
@@ -192,6 +192,10 @@ rez                = fullMPMU(rez, DATA);% extract final spike times (overlappin
 if ops.GPU
     reset(gpu)
 end
+
+% % save output locally
+% save(fullfile(ops.root,  'rez.mat'), 'rez', 'ops', '-v7.3');
+% rezToPhy(rez, ops.root);
 
 % 10) Set Ops to point back to the server directory
 ops = io.convertOpsToNewDirectory(ops, OLD_DIR);

@@ -99,34 +99,35 @@ nPds = numel(PDS);
 for kPds = 1:nPds
     
     try
-    [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
-    fprintf('Reading [%s] \n', edfFile)
-    [dataRAW, timestamps, el_info] = getEdfData(sess, PDS{kPds});
-    fwrite(fidout, dataRAW', '*uint16')
-    
-    elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
-    elInfo.fragments    = [elInfo.fragments el_info.fragments];
-    elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
-    elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
-    elInfo.bitDeg       = el_info.bitDeg;
-    catch
-        try
-        fprintf('Trying for backup edf file\n')
-%         [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
-        edfFile = PDS{kPds}.initialParametersMerged.eyelink.edfFile;
+        [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
         fprintf('Reading [%s] \n', edfFile)
-        if exist(fullfile(sess.path, edfFile), 'file')
-        [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds}, edfFile);
-        fwrite(fidout, dataRAW', '*uint16');
+        [dataRAW, timestamps, el_info] = getEdfData(sess, PDS{kPds});
+        fwrite(fidout, dataRAW', '*uint16')
         
         elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
         elInfo.fragments    = [elInfo.fragments el_info.fragments];
         elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
         elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
         elInfo.bitDeg       = el_info.bitDeg;
-        else
-            warning('no edf data for PDS %d [%s]', kPds, edfFile)
-        end
+    catch
+        try
+            fprintf('Trying for backup edf file\n')
+            %         [~, edfFile, ~] = fileparts(PDS{kPds}.initialParametersMerged.session.file);
+            edfFile = PDS{kPds}.initialParametersMerged.eyelink.edfFile;
+            fprintf('Reading [%s] \n', edfFile)
+            
+            if ~isempty(dir(fullfile(sess.path, [edfFile '*'])))
+                [dataRAW, ~, el_info] = getEdfData(sess, PDS{kPds}, edfFile);
+                fwrite(fidout, dataRAW', '*uint16');
+                
+                elInfo.timestamps   = [elInfo.timestamps el_info.timestamps];
+                elInfo.fragments    = [elInfo.fragments el_info.fragments];
+                elInfo.sampleRate   = [elInfo.sampleRate el_info.sampleRate];
+                elInfo.dateNum      = [elInfo.dateNum el_info.dateNum];
+                elInfo.bitDeg       = el_info.bitDeg;
+            else
+                warning('no edf data for PDS %d [%s]', kPds, edfFile)
+            end
         catch me
             warning(me.identifier, me.message)
             warning('no edf data for PDS %d [%s]', kPds, edfFile)
@@ -145,7 +146,8 @@ assert(numel(elInfo.sampleRate)==1, 'Eyelink sample rate changed throughout sess
 
 fclose(fidout);
 save(felinfo, '-v7.3', '-struct', 'elInfo');
-save(feltime, '-v7', 'timestamps')
+
+
 
 fid = fopen(feye, 'r');
 fseek(fid, 0, 'eof');
@@ -164,6 +166,7 @@ if exist(feltime, 'file')
     load(feltime);
 else
     timestamps = io.convertSamplesToTime(1:nTotSamps, elInfo.sampleRate, elInfo.timestamps(:), elInfo.fragments(:));
+    save(feltime, '-v7', 'timestamps')
 end
 
 if flipX

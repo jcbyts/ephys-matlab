@@ -163,13 +163,25 @@ classdef faceForage < handle
         
         function [trial, display, stimTrials] = importPDS_v2(PDS)
             
+            % collapse all data into a struct array
+            tmp = pds.getPdsTrialData(PDS);
+            
             trial   = [];
             display = PDS.initialParametersMerged.display;
             
-            stim = 'faceforage';
+            stim = 'faceforage'; % check for old naming convention
+            condstim = 'forage'; % the field has been saved two ways historically
             
-            trialIx = cellfun(@(x) isfield(x, stim), PDS.data);
-            trialIx = trialIx | cellfun(@(x) isfield(x, 'forage'), PDS.data);
+            if isfield(tmp, stim)
+                trialIx = arrayfun(@(x) x.(stim).use, tmp);
+            else
+                trialIx = false(numel(tmp), 1);
+            end
+            
+            if isfield(tmp, condstim)
+                trialIx = trialIx | arrayfun(@(x) x.(condstim).use, tmp);
+            end
+            
             stimTrials = find(trialIx);
             
             % --- check for conditions
@@ -177,7 +189,7 @@ classdef faceForage < handle
             % some trials do not include the hartley stimulus. Those trials
             % would've been set by the condition field of pldaps. Check for
             % the use of conditions and then check if hartley was used.
-            condstim = 'forage';
+            
             if ~isempty(PDS.conditions)
                 condIx = cellfun(@(x) isfield(x, condstim), PDS.conditions(stimTrials));
                 
@@ -208,11 +220,13 @@ classdef faceForage < handle
                 
                 nFrames = numel(trial(kTrial).frameTimes);
                 try
+                     stim = 'faceforage';
                     trial(kTrial).xpos = PDS.data{thisTrial}.(stim).x(1:nFrames,:);
                     trial(kTrial).ypos = PDS.data{thisTrial}.(stim).y(1:nFrames,:);
                     trial(kTrial).hold = PDS.data{thisTrial}.(stim).ctrHold(1:nFrames,:);
                 catch
                     stim = 'forage';
+                    
                     trial(kTrial).xpos = PDS.data{thisTrial}.(stim).x(1:nFrames,:);
                     trial(kTrial).ypos = PDS.data{thisTrial}.(stim).y(1:nFrames,:);
                     trial(kTrial).hold = PDS.data{thisTrial}.(stim).ctrHold(1:nFrames,:);

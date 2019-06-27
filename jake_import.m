@@ -37,7 +37,7 @@ thisSession = io.importStimulusProtocols(thisSession);
 %% sort with kilosort
 WaitSecs(1)
 
-preprocess.runKiloSort(thisSession, 'merge', true)
+preprocess.runKiloSort(thisSession, 'merge', true, 'overwrite', false)
 
 
 %% Import Kilosort spikes 
