@@ -41,6 +41,13 @@ switch name
         shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
         shank{1}.name = 'V1';
         
+    case {'Nandy', 'NeuroNexus64_2_32'}
+        
+        shank{1} = hardware.electrode.NeuroNexus64_2_32;
+        shank{1}.headstages{1} = hardware.headstage.intan_RHD2132;
+        shank{1}.headstages{2} = hardware.headstage.intan_RHD2132;
+        shank{1}.name = 'Anirvan Probe';
+        
     case 'AcuteZif2Om32'
         
         shank{1} = hardware.electrode.AtlasZifOmnDrive_1;

@@ -58,7 +58,7 @@ switch nd
     otherwise
         error('spatialRfAutoSmooth: number of dimensions must be 1 , 2, or 3')
 end
-Cinv = Cinv + 5*eye(size(Cinv,1)); % add ridge parameter
+Cinv = Cinv + 4*eye(size(Cinv,1)); % add ridge parameter
 
 constCols = var(X)==0;
 Cinv(constCols,:) = [];

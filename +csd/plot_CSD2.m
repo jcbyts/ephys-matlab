@@ -1,4 +1,4 @@
-function plot_CSD(CSD_matrix,zs,dt,scale_plot,max_plot)
+function plot_CSD2(CSD_matrix,zs,dt,scale_plot,max_plot)
 %plot_CSD(CSD_matrix,scale_plot,max_plot,figure_label)
 %
 %Used to plot the color-plots of the CSD. The colormap_redblackblue goes

@@ -17,7 +17,14 @@ classdef headstage < handle
             
         end
         
+        function chanMap = mapChannels(p, probe)
+            
+            assert(isa(probe,'hardware.electrode.probe'), 'mapChannels requires a probe as input')
+            chanMap = p.channelMap(probe.channelMap);
+            
+        end
     end
     
+
 end
 

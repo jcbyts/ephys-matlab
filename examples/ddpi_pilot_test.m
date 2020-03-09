@@ -5,9 +5,9 @@ meta = io.getExperimentsAnd('Subject', 'Harold');
 %% load data
 nSessions = size(meta, 1);
 
-iSession = 1;
+iSession = 3;
 
-thisSession = meta(end,:);
+thisSession = meta(iSession,:);
 
 PDS = io.getPds(thisSession);
 
@@ -48,7 +48,7 @@ time = [];
 eyex = [];
 eyey = [];
 
-for im = 1:numel(mvl)
+for im = 1%:numel(mvl)
     elapsedtime = datestr(offsetdt(im), 'HHMMSS');
     elapsedsec = str2double(elapsedtime(1:2))*60*60 + str2double(elapsedtime(3:4))*60 + str2double(elapsedtime(5:6));
     
